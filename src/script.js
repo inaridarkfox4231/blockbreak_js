@@ -32,6 +32,17 @@
 // 装飾はさらにそのあと。長丁場になる。
 // 作ってた頃は働いてなかったからエネルギー全注力できたけど今はそれできないから少しずつ少しずつやっていくしかないわね。
 
+// ライフは3, 6, 10, 15でいい気がしてきた。あと難易度丁度いい（気がする）のでこのまま作っちゃおう。
+// 衝突判定単純でした。バリデーションかけたあと、移動後に衝突するならそれを使う感じで、あとぶつかった時の反射はその
+// calc_is_farを使ってバリデーションかけてる、これがあれの時は判定に使わない、的な感じのあれ。
+// colliderに相当するのはrectでしょう。これでいいか。
+// つまりボールはrectと思ってやってるのね。
+
+// サイズの確認
+// 各ブロックは20x20が基本で最大で40x40とか20x200とか200x20
+// ボールは16x16
+// パドルは横幅が80,60,40,30で縦幅が5です（薄い）
+
 // STEP1: system
 // STEP2: state
 // STEP3: title, select, mode (イマココ 2021/02/04)
@@ -267,7 +278,7 @@ class Mode extends State{
         if(this.mode === 0){
           this.setNextState("select");
         }else{
-          this.setNextState("play");
+          this.setNextState("eyecatch");
         }
         break;
 		}
@@ -300,27 +311,81 @@ class Mode extends State{
 // ここでステージデータを作っちゃう（Startに渡してPlayにも渡す）
 // データはクラスの形にすべきかな
 // シードはjsonか画像データかまあ別に作ってそれを元にデータを生成する流れ
+// Modeからの場合はstageNumberをlevel * 5 - 4で計算（1,6,11,16,21）,difficulty情報をmodeから取得
+// Clearからの場合はそのままでOK. difficultyはmodeから来た時に設定された値がそのまま保持されているし、
+// このあとStart経由でplayに設定されたらクリアかオーバーまでずっと保持されるから設定の必要なし。
 class Eyecatch extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "eyecatch";
+		this.stageNumber = 0; // 1～25
+		this.difficulty = 0; // 1～4
+		this.frame = 0;
 	}
-  drawPrepare(){}
-	prepare(_state){}
-  keyAction(code){}
-	update(){}
-	draw(){}
+  drawPrepare(){
+		this.gr.textAlign(CENTER, CENTER);
+		this.gr.textSize(64);
+		this.gr.textFont(huiFont);
+		this.gr.fill(255);
+	}
+	prepare(_state){
+		switch(_state.name){
+			case "mode":
+		  	//
+			  this.stageNumber = _state.level * 5 - 4;
+				this.difficulty = _state.mode;
+				break;
+			case "clear":
+			  this.stageNumber = _state.stageNumber;
+				break;
+		}
+		this.frame = 0;
+	}
+  keyAction(code){
+		// 自動的に移行するので操作は無し
+	}
+	update(){
+		this.frame++;
+		if(this.frame == 60){ this.setNextState("start"); }
+	}
+	draw(){
+		this.gr.background(0);
+		this.gr.text("STAGE" + this.stageNumber, CANVAS_W * 0.5, CANVAS_H * 0.5);
+		image(this.gr, 0, 0);
+	}
 }
 
+// ここでステージナンバーを元にステージデータを生成し
+// それに基づいて描画させる。ステージデータはgraphicを受け取りそこにブロックを追加で描画するだけの処理。
+// ステージデータのブロック画像から切り貼りするだけだからgrへの操作は不要。imageしか使わない。
+// eyecatchからくる場合とplayから来る場合（やられたとき）があるがステージ生成処理はeyecatchから来るときだけ行なう（当然ね）
+// どっちからくるにしても初期化処理を行なう（難易度に応じて）. paddleとか画像もcolliderも異なるので。位置とかも。
+
+// とりあえずstagedataにダミー入れてテストだわね
+// ここから先はもろもろ用意しないとどうしようもないな
 class Start extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "start";
+		this.data = undefined;
+		this.stageNumber = 0;
+		this.difficulty = 0;
+		this.ball = new Ball(); // パドルと一緒に動くだけ。発射時に位置情報をplayに渡す
+	  this.paddle = new Paddle(); // パドルはマウスと一緒に動く。発射時に位置情報を以下略. 難易度情報は初めに1回だけセットする
 	}
   drawPrepare(){}
-	prepare(_state){}
+	prepare(_state){
+		switch(_state.name){
+			case "eyecatch":
+			  this.data = new Stagedata(_state.stageNumber);
+				this.stageNumber = _state.stageNumber; // まあdataに入ってるけど一応ね
+				this.difficulty = _state.difficulty; // 難易度が無いとパドルを作れない
+				break;
+		}
+	}
   keyAction(code){}
-	update(){}
+	update(){
+	}
 	draw(){}
 }
 
@@ -375,6 +440,93 @@ class Allclear extends State{
   keyAction(code){}
 	update(){}
 	draw(){}
+}
+
+// ボール、パドル、ブロック
+
+// ボール
+// 大きさは全部一緒でStart用とPlay用に2つインスタンス作る。Startの方はボールが発射されるまで表示
+// サイズ16x16 円だけど判定はrectで行なう。その方が楽。
+class Ball{
+  constructor(){
+		// x, yは中心の座標
+		this.x = 0;
+		this.y = 0;
+		this.vx = 0;
+		this.vy = 0;
+		this.gr = createGraphics(16, 16);
+		this.prepareGraphics();
+		this.collider = new Rectcollider(-8, -8, 16, 16);
+	}
+	initialize(x, y){
+
+	}
+	prepareGraphics(){
+		this.gr.noStroke();
+		this.gr.fill(255);
+		this.gr.circle(8, 8, 16);
+	}
+	update(){
+		// 速度更新の前に・・ん－。更新前に衝突関連処理行なうので注意ね
+		this.x += this.vx;
+		this.y += this.vy;
+	}
+	draw(gr){
+		// grに画像を貼り付ける
+		gr.image(this.gr, this.x - 8, this.y - 8);
+	}
+}
+
+// パドル
+// 難易度により大きさと色を変える、これもStartとPlayで2つインスタンス
+// ボールと衝突判定する。なおブロックの配置の都合上ブロック・・あー、まあ、いいや。
+class Paddle{
+
+}
+
+// ブロック
+class Block{
+
+}
+
+// Rectcollider
+// 長方形領域。ボールとかブロックとかパドルに持たせる
+// これを使ってcalc_far(遠くにあるときは判定しないやつ)とか衝突した時の・・
+// 位相はぶつかった時だけ計算すればいいと思うんだ・・（ballposのところを読みながら）ねぇ？無駄が多いなぁ。困ったもんだ。
+// calc_farも要らない気がする。次のフレームの位置に対してそれが衝突しない感じならスルー、衝突する感じなら
+// そのときに移動前の情報により位相を計算しそれに応じて・・
+// めり込みの処理をしてない！？でも普通に動いてるな・・速度更新の前に次の位置がめり込む場合に衝突と考えて
+// 反射もろもろ処理してる。それで動いてるんだからすごいな。まあいいか（？）
+// めりこみめっちゃ苦しんだ過去があるから複雑な気持ちもあるけど深く考えないことにする。ボール大きいしその辺でバランス取ってそう。
+// ブロック崩しって見かけによらずほんとにバグらない実装難しくて、これもパドルがめちゃ低い位置あるけど以前はちょい上の方だったし
+// パドルも太かった。それでやったらボールが壁とサンドイッチされる致命的なバグが発生して自由なステージ作りがしづらくなった。
+// だから諦めた経緯がある。まあいいです。じゃあtopとかそこら辺、centerとか、そういう情報保持のためのクラスってことで。
+// updateしながら。それでいこう。衝突はいつものようにpreviousを使って・・そうするとrect要らんけどな！
+// あ、colliderにpreviousの概念用意する？違う、ballにpreviousのcolliderで二重で用意すればいいや。
+// ブロックは動かないしpaddleのupdateのあとでballのupdateやってる。順番がはっきりしてるなら迷うことは何もないな。
+// 単純なロジック。楽勝でしょう。
+// ・・・・・
+class Rectcollider{
+	constructor(left, top, w, h){
+		this.left = left;
+		this.top = top;
+		this.w = w;
+		this.h = h;
+		this.right = left + w;
+		this.bottom = top + h;
+	}
+	update(l, t){
+		this.left = l;
+		this.top = t;
+		this.right = l + this.w;
+		this.bottom = t + this.h;
+	}
+	collideWithRect(other){
+		// 相手colliderとの交叉判定
+		if(this.right < other.left || other.right < this.left){ return false; }
+		if(this.bottom < other.top || other.bottom < this.top){ return false; }
+		return true;
+	}
 }
 
 // ステージデータ
