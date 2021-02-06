@@ -128,6 +128,11 @@ class System{
     nextState.prepare(this.currentState); // 遷移前の諸準備
     this.currentState = nextState; // 移行
   }
+	systemSetup(difficulty){
+		// レベル開始時に1回だけやる処理
+		this.state.start.initialize(difficulty); // パドル画像を用意しつつボールの状態を元に戻して
+		this.state.play.initialize(difficulty); // ライフを設定しつつスコアを0に
+	}
 	update(){
 		this.currentState.update();
 	}
@@ -297,6 +302,11 @@ class Mode extends State{
         if(this.mode === 0){
           this.setNextState("select");
         }else{
+					// このタイミングでやること
+					// 1.playに難易度に応じたライフを用意させてスコアを0に戻す
+					// 2.startに難易度に応じたパドルを用意させる
+					// いずれもSystemにやらせる
+					this.node.systemSetup();
           this.setNextState("eyecatch");
         }
         break;
@@ -350,7 +360,6 @@ class Eyecatch extends State{
 	prepare(_state){
 		switch(_state.name){
 			case "mode":
-		  	//
 			  this.stageNumber = _state.level * 5 - 4;
 				this.difficulty = _state.mode;
 				break;
@@ -392,17 +401,22 @@ class Start extends State{
 		this.ball = new Ball(); // パドルと一緒に動くだけ。発射時に位置情報をplayに渡す
 	  this.paddle = new Paddle(); // パドルはマウスと一緒に動く。発射時に位置情報を以下略. 難易度情報は初めに1回だけセットする
 	}
+	initialize(difficulty){
+		this.ball.initialize(difficulty);
+		this.paddle.initialize(difficulty);
+	}
   drawPrepare(){}
 	prepare(_state){
 		switch(_state.name){
 			case "eyecatch":
-			  this.data = new Stagedata(_state.stageNumber);
+			  this.data = new Stagedata(_state.stageNumber); // stageNumberによりステージを生成。
 				this.stageNumber = _state.stageNumber; // まあdataに入ってるけど一応ね
 				this.difficulty = _state.difficulty; // 難易度が無いとパドルを作れない
 				break;
 		}
-		this.ball.initialize();
-		this.paddle.initialize(this.difficulty);
+		// どっちからくるにしてもresetは必須
+		this.ball.reset();
+		this.paddle.reset();
 	}
   keyAction(code){
 		// マウス操作だから特に・・
@@ -417,10 +431,23 @@ class Start extends State{
 // 最初に準備段階があってその間は・・うーん。ステージコールは別ステートにするか・・情報だけ付与して。その方がdraw場合分けしなくて済む。
 // あと発射段階って絵面はPlayのやつ横取りすればいい、Pauseみたいに。で、パドル動かしてボール・・そうね・・
 // じゃあEyecatchとStart作るか。
+
+// 思ったけどStartからボールとパドル受け渡す形でいいんじゃ・・？？そうしよう。
 class Play extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "play";
+		this.life = 0; // ゲームオーバーに移行するかどうかの指標
+		this.score = 0; // スコア
+		this.ball = undefined; // Startにもらう
+		this.paddle = undefined; // Startにもらう
+		this.data = undefined; // Startから来た時にデータをもらう。データはStartでeyecatchから来た時作ったものを交互に受け渡す形。
+	}
+	initialize(difficulty){
+		// レベル開始時に1回だけやる処理。ライフの設定とスコアのリセット。
+		let lifeArray = [0, 3, 5, 10, 15];
+		this.life = lifeArray[difficulty];
+		this.score = 0;
 	}
   drawPrepare(){}
 	prepare(_state){}
@@ -470,29 +497,54 @@ class Allclear extends State{
 // ボール
 // 大きさは全部一緒でStart用とPlay用に2つインスタンス作る。Startの方はボールが発射されるまで表示
 // サイズ16x16 円だけど判定はrectで行なう。その方が楽。
+// スピードは通常時が4で加速時が6だそうです
 class Ball{
   constructor(){
-		// x, yは中心の座標
+		// x, yは左上の座標
 		this.x = 0;
 		this.y = 0;
-		this.vx = 0;
-		this.vy = 0;
+		this.speed = 4; // speedとdirectionで位置更新するか
+		this.direction = 0;
 		this.gr = createGraphics(16, 16);
+		this.wait = true; // フラグ。trueならstart中ということ、falseならplay中ということ。
+		this.alive = true; // フラグ。下に落ちた時にtrueとなりやられた判定が発生してStartに戻る流れ。
+		this.paddleWidth = 0; // パドルの幅情報がないといろいろと不便
 		this.prepareGraphics();
-		this.collider = new Rectcollider(-8, -8, 16, 16);
 	}
-	initialize(x, y){
-
+	initialize(difficulty){
+		// 位置ねぇ・・wait中はマウス位置によるからまあいいや。
+		// 発射時のあれこれはStartがボールに指示出すのでいいです
+		// Startにくるたび必ずやる処理をresetという形で分離する
+    this.reset();
+		// 難易度が絡むところだけが異なる。ほぼほぼreset.
+		let wArray = [0, 80, 60, 40, 30];
+		this.paddleWidth = wArray[difficulty];
+	}
+	reset(){
+		// この辺はStartにくるたび毎回やる
+		this.speed = 4;
+		this.direction = 0;
+		this.alive = true;
+		this.wait = true;
 	}
 	prepareGraphics(){
+		// グラデするかもだけど
 		this.gr.noStroke();
 		this.gr.fill(255);
 		this.gr.circle(8, 8, 16);
 	}
 	update(){
-		// 速度更新の前に・・ん－。更新前に衝突関連処理行なうので注意ね
-		this.x += this.vx;
-		this.y += this.vy;
+		if(this.wait){
+			// wait中はマウス位置に勝手に移動
+			this.x = mouseX - 8;
+			this.x = constrain(this.x, this.paddleWidth * 0.5 - 8, CANVAS_W - this.paddleWidth * 0.5 - 8);
+			this.y = CANVAS_H - 5 - 16;
+		}else{
+		  // 速度更新の前に・・ん－。更新前に衝突関連処理行なうので注意ね
+			// play中は衝突もろもろのあとで速度足すだけです
+		  this.x += this.speed * Math.cos(this.direction);
+		  this.y += this.speed * Math.sin(this.direction);
+		}
 	}
 	draw(gr){
 		// grに画像を貼り付ける
@@ -503,8 +555,51 @@ class Ball{
 // パドル
 // 難易度により大きさと色を変える、これもStartとPlayで2つインスタンス
 // ボールと衝突判定する。なおブロックの配置の都合上ブロック・・あー、まあ、いいや。
+// 横幅：80,60,40,30.縦の長さは5です
 class Paddle{
+	constructor(){
+		this.x = 0;
+		this.y = 0;
+		this.w = 0;
+		this.h = 5;
+		this.active = false; // 左クリックでアクティブ化
+		this.count = 0; // アクティブ状態の持続時間は30フレーム
+		this.prepareAllGraphics();
+	}
+	prepareAllGraphics(){
+		// パドルの全体画像の用意
+		// とりあえず赤と青の長方形でいいよ
+		this.activePaddles = createGraphics(80, 20);
+		this.nonActivePaddles = createGraphcis(80, 20);
+	}
+	initialize(difficulty){
+		this.reset();
+		// difficultyは1～4で難易度に対応
+		let wArray = [0, 80, 60, 40, 30];
+		this.w = wArray[difficulty];
+		this.activegr = createGraphics(this.w, this.h);  // 赤パドル（クリックでアクティブする）
+		this.nonActivegr = createGraphcis(this.w, this.h); // 青パドル
+		this.prepareGraphics();
+		// 位置関連はいいや。どうせマウス位置に勝手に移動するんだから。
+	}
+	reset(){
+		// Startにくるたびに毎回やるのはこんなところかな
+		// 他にやることないだろ
+		this.active = false;
+		this.count = 0;
+	}
+	prepareGraphics(){
 
+	}
+	update(){
+		this.x = mouseX - this.w * 0.5;
+		this.x = constrain(this.x, 0, CANVAS_W - this.w);
+		this.y = CANVAS_H - this.h;
+		if(this.active){ this.count--; if(this.count === 0){ this.active = false; } }
+	}
+	draw(gr){
+		gr.image((this.active ? this.activegr : this.nonActivegr), this.x, this.y);
+	}
 }
 
 // ブロック
@@ -529,28 +624,7 @@ class Block{
 // ブロックは動かないしpaddleのupdateのあとでballのupdateやってる。順番がはっきりしてるなら迷うことは何もないな。
 // 単純なロジック。楽勝でしょう。
 // ・・・・・
-class Rectcollider{
-	constructor(left, top, w, h){
-		this.left = left;
-		this.top = top;
-		this.w = w;
-		this.h = h;
-		this.right = left + w;
-		this.bottom = top + h;
-	}
-	update(l, t){
-		this.left = l;
-		this.top = t;
-		this.right = l + this.w;
-		this.bottom = t + this.h;
-	}
-	collideWithRect(other){
-		// 相手colliderとの交叉判定
-		if(this.right < other.left || other.right < this.left){ return false; }
-		if(this.bottom < other.top || other.bottom < this.top){ return false; }
-		return true;
-	}
-}
+// 一旦、なくすか
 
 // ステージデータ
 // ブロック構成に関する完全なデータ
