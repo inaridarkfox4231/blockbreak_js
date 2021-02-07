@@ -432,7 +432,7 @@ class Start extends State{
 // あと発射段階って絵面はPlayのやつ横取りすればいい、Pauseみたいに。で、パドル動かしてボール・・そうね・・
 // じゃあEyecatchとStart作るか。
 
-// 思ったけどStartからボールとパドル受け渡す形でいいんじゃ・・？？そうしよう。
+// 思ったけどStartからボールとパドル互いに受け渡す形でいいんじゃ・・？？そうしよう。
 class Play extends State{
 	constructor(_node){
 		super(_node);
@@ -505,7 +505,8 @@ class Ball{
 		this.y = 0;
 		this.speed = 4; // speedとdirectionで位置更新するか
 		this.direction = 0;
-		this.gr = createGraphics(16, 16);
+		this.grList = createGraphics(32, 16); // すべてのグラフィック（2通りしかないけど）
+		this.gr = createGraphics(16, 16); // 現在のグラフィック
 		this.wait = true; // フラグ。trueならstart中ということ、falseならplay中ということ。
 		this.alive = true; // フラグ。下に落ちた時にtrueとなりやられた判定が発生してStartに戻る流れ。
 		this.paddleWidth = 0; // パドルの幅情報がないといろいろと不便
@@ -529,9 +530,12 @@ class Ball{
 	}
 	prepareGraphics(){
 		// グラデするかもだけど
-		this.gr.noStroke();
-		this.gr.fill(255);
-		this.gr.circle(8, 8, 16);
+		this.grList.noStroke();
+		this.grList.fill(255); // 白で
+		this.grList.circle(8, 8, 16);
+		this.grList.fill(255, 0, 0); // アクティブ時は赤で
+		this.grList.circle(24, 8, 16);
+		this.gr.image(this.grList, 0, 0, 16, 16, 0, 0, 16, 16);
 	}
 	update(){
 		if(this.wait){
@@ -562,23 +566,38 @@ class Paddle{
 		this.y = 0;
 		this.w = 0;
 		this.h = 5;
+		this.difficulty = 0; // 難易度情報。これがないと画像チェンジのときに困る
 		this.active = false; // 左クリックでアクティブ化
 		this.count = 0; // アクティブ状態の持続時間は30フレーム
+		this.grList = createGraphics(80, 40);
+		this.gr = undefined;
 		this.prepareAllGraphics();
 	}
 	prepareAllGraphics(){
 		// パドルの全体画像の用意
-		// とりあえず赤と青の長方形でいいよ
-		this.activePaddles = createGraphics(80, 20);
-		this.nonActivePaddles = createGraphcis(80, 20);
+		// とりあえず白と赤で
+		this.grList.noStroke();
+		this.grList.fill(255);
+		this.grList.rect(0, 0, 80, 5);
+		this.grList.rect(0, 5, 60, 5);
+		this.grList.rect(0, 10, 40, 5);
+		this.grList.rect(0, 15, 30, 5);
+		this.grList.fill(255, 0, 0);
+		this.grList.rect(0, 20, 80, 5);
+		this.grList.rect(0, 25, 60, 5);
+		this.grList.rect(0, 30, 40, 5);
+		this.grList.rect(0, 35, 30, 5);
 	}
 	initialize(difficulty){
 		this.reset();
 		// difficultyは1～4で難易度に対応
 		let wArray = [0, 80, 60, 40, 30];
-		this.w = wArray[difficulty];
-		this.activegr = createGraphics(this.w, this.h);  // 赤パドル（クリックでアクティブする）
-		this.nonActivegr = createGraphcis(this.w, this.h); // 青パドル
+		// difficultyプロパティはクリックでアクティベートするときに切り替え（30フレームの間アクティブになる）
+		this.difficulty = difficulty;
+		this.w = wArray[this.difficulty];
+		this.gr = createGraphics(this.w, this.h);  // ここに落とす
+		// this.grListから切り抜いてthis.grに落とす
+		this.gr.image(this.grList, 0, 0, this.w, this.h, 0, 5 * (this.difficulty - 1),this.w, this.h);
 		this.prepareGraphics();
 		// 位置関連はいいや。どうせマウス位置に勝手に移動するんだから。
 	}
@@ -598,13 +617,34 @@ class Paddle{
 		if(this.active){ this.count--; if(this.count === 0){ this.active = false; } }
 	}
 	draw(gr){
-		gr.image((this.active ? this.activegr : this.nonActivegr), this.x, this.y);
+		gr.image(this.gr, this.x, this.y);
 	}
 }
 
 // ブロック
+// 画像は生成時に設定される。データを持ってるのはStagedataクラスで、そっちで設定する感じ。
+// a0～a4(2x1), b0～b4(1x2), c0～c4(1x1), d0～d4(2x2)が通常ブロックでタフネスにより色が異なる
+// ぶつかるたびに薄くなっていく、黄色、オレンジ、赤、紫、青の順でつよい
+// e0～e2(2x1)は緑、黄緑、スカイブルーでこれらは強くぶつけないと薄くならない
+// f0～f2(1x2)は縦バージョン
+// g(2x1)とh(1x2)は1UPです。1回普通に当てただけでライフが回復します。
+// i0～i9とj0～j9はそれぞれ1x1～1x10と1x1～10x1です（1x1がかぶってるけど気にしない）
+// あと壁のkとlですべて。これらがブロック要素の画像のすべてとなります。
+// 面倒なので生成時に画像渡しちゃおう（そうしよう）
 class Block{
-
+	constructor(x, y, _type, gr){
+		this.x = x;
+		this.y = y;
+		this._type = _type; // a0とかd4とかkとか
+		this.tough = 0; // HPに相当する値。壊せない場合はInfinityを設定。
+		this.must = true; // 壊すべきか否か。これがtrueのものをすべて壊すことがクリアフラグ条件の半分（もう半分はエフェクト）
+		// エフェクトは後で作るのでとりあえずはmust==trueをすべて壊す、でOK. 作らないことにはどうしようもないので。
+		this.setTough();
+		this.gr = gr;
+	}
+	setProperty(){
+		// _typeに基づいてタフネス値や壊すべきかどうかのフラグを設定
+	}
 }
 
 // Rectcollider
