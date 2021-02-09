@@ -1,0 +1,226 @@
+フローチャート
+パドルをマウスで動かす
+ボールを固定して
+左クリックで発射出来るようにして
+右クリックでパドル強化
+するとボールの速さが変わる
+そうしないと
+
+じゃなくてね
+
+次にやることは？
+
+登場するのは
+
+2021/02/09/03:21
+お誕生日おめでと！自分に！
+
+それはいいとして（いいのかよ）
+んーーーー。。。
+テンプレート見直す必要があるわね・・このまま文章書き連ねてもなんかあれ、えたーなる気しかしない
+何とかしないとね
+根本から見直す必要がある
+テストもしやすくしないと
+テトリスは簡単だったから全体像ほぼ作り上げてからテストしてもすんなりハマったけどこれはそういうわけにはいかなそう
+なんだけど多分それは思い込みで
+普通にやれば骨組みつくれるはずなんだよ
+だから見直す
+骨組みを作り肉付きを作る
+その手順で行けばやれる
+
+gameSystemクラスを作って独立させる
+今現在「stageData」とかいう名前で運用しているところのそれを・・gameCore？
+GameCoreクラスを作る。
+class GameCore{
+  constructor(seedNumber){
+    以下略
+  }
+}
+
+// 違うだろ
+メソッドで
+setPattern(patternId){}
+とかやる、jsonはグローバルでダウンロードしたものを使う、って感じじゃねーの。で、setのたびに
+paddle集合とかマウス操作による動かし方、なんやらかんやら、そういう感じだと思うよ。
+STGコードのあれ、あれを意識すると構築しやすいかも。
+
+class GameSystem{
+  constructor(){
+    this.paddles = [];
+    this.ball = new Ball();
+    this.blocks = [];
+    this.gutter = new Gutter();
+    this.board = undefined; // createGraphics()で指定された大きさの画面を作る
+    // 付属品
+    this.score = 0; // 加算されていく
+    this.life = 0; // 難易度を受け取った時にパドルの太さなどの情報と一緒に・・
+    this.difficulty = 0; // 難易度情報を受け取る。ステージ番号と一緒に。このデータが無いとパドル生成の時困る
+    // ステージ番号は使う機会がない。StartとPlayだけ持ってればいいんじゃない。むしろ操作用の情報って感じ
+    this.effects = []; // ブロック壊れたりボール消えたりするときにエフェクトが生成されてここに。
+    // 条件としてはエフェクトが空っぽで
+    // 1.ボールがaliveしてなくてlifeが正→Startに戻る
+    // 2.ボールがaliveしてなくてlifeが0→Gameoverに移行
+    // （これ以降はボールがaliveが前提、ボールがnot aliveの場合上の二つに強制的になる、たとえブロックがひとつもなくてもね）
+    // 3.ボールがaliveでブロックが空っぽ→Clearに移行することを伝える。
+    // その情報を受け取ったplay側がstageNumberを見たうえでClearかAllClearに移行、まあどっちにしろClearなわけだけど。
+    // ClearにscoreとstageNumberを伝えてstageNumber次第ではScoreに移行させる、かどうか。まあlifeを用いた
+    // score計算とか考えるとあった方が、いいね。
+  }
+}
+
+// もしくは一旦Playに渡したうえで直後にStartでまたPlay,ってやった方がいいのかも？
+// Startからのprepareでこれのsystemがおねむのときに、みたいな。そうでないときは別の処理
+// GameSystemの状態：activeかそうでないか。ゲームが始まってない段階なら・・・？
+// え？
+// Startが要らない・・まあ、そういえばそうか・・そうね・・Start要らないか・・んー。
+// eyecatchは残すよ、番号コールするだけだからあれ。
+
+// Start廃止になりそう
+よく考えたらパドルやボールの状態が違うだけだし
+場合分け面倒だけどStartの微妙な立ち位置に配慮する方がよほど面倒
+メインでないStartでGameSystemを稼働させるのもなんか不自然だし
+さらにいうとeyecatchも要らないのか？ぼまふぉ（ボマーフォックス）みたく番号コールアニメーション流せばいいだけだろ。
+Playだけでいけるな・・・シンプルな方がいいよね。
+
+/*
+ゴミ箱
+// ステージ開始前のスポットみたいなやつ
+// まあステージ番号コールするだけ
+// ここでステージデータを作っちゃう（Startに渡してPlayにも渡す）
+// データはクラスの形にすべきかな
+// シードはjsonか画像データかまあ別に作ってそれを元にデータを生成する流れ
+// Modeからの場合はstageNumberをlevel * 5 - 4で計算（1,6,11,16,21）,difficulty情報をmodeから取得
+// Clearからの場合はそのままでOK. difficultyはmodeから来た時に設定された値がそのまま保持されているし、
+// このあとStart経由でplayに設定されたらクリアかオーバーまでずっと保持されるから設定の必要なし。
+class Eyecatch extends State{
+	constructor(_node){
+		super(_node);
+		this.name = "eyecatch";
+		this.stageNumber = 0; // 1～25
+		this.difficulty = 0; // 1～4
+		this.frame = 0;
+	}
+  drawPrepare(){
+		this.gr.textAlign(CENTER, CENTER);
+		this.gr.textSize(64);
+		this.gr.textFont(huiFont);
+		this.gr.fill(255);
+	}
+	prepare(_state){
+		switch(_state.name){
+			case "mode":
+			  this.stageNumber = _state.level * 5 - 4;
+				this.difficulty = _state.mode;
+				break;
+			case "clear":
+			  this.stageNumber = _state.stageNumber;
+				break;
+		}
+		this.frame = 0;
+	}
+  keyAction(code){
+		// 自動的に移行するので操作は無し
+	}
+	update(){
+		this.frame++;
+		if(this.frame == 60){ this.setNextState("start"); }
+	}
+	draw(){
+		this.gr.background(0);
+		this.gr.text("STAGE" + this.stageNumber, CANVAS_W * 0.5, CANVAS_H * 0.5);
+		image(this.gr, 0, 0);
+	}
+}
+
+// ここでステージナンバーを元にステージデータを生成し
+// それに基づいて描画させる。ステージデータはgraphicを受け取りそこにブロックを追加で描画するだけの処理。
+// ステージデータのブロック画像から切り貼りするだけだからgrへの操作は不要。imageしか使わない。
+// eyecatchからくる場合とplayから来る場合（やられたとき）があるがステージ生成処理はeyecatchから来るときだけ行なう（当然ね）
+// どっちからくるにしても初期化処理を行なう（難易度に応じて）. paddleとか画像もcolliderも異なるので。位置とかも。
+
+// とりあえずstagedataにダミー入れてテストだわね
+// ここから先はもろもろ用意しないとどうしようもないな
+class Start extends State{
+	constructor(_node){
+		super(_node);
+		this.name = "start";
+		this.data = undefined;
+		this.stageNumber = 0;
+		this.difficulty = 0;
+		this.ball = new Ball(); // パドルと一緒に動くだけ。発射時に位置情報をplayに渡す
+	  this.paddle = new Paddle(); // パドルはマウスと一緒に動く。発射時に位置情報を以下略. 難易度情報は初めに1回だけセットする
+	}
+	initialize(difficulty){
+		this.ball.initialize(difficulty);
+		this.paddle.initialize(difficulty);
+	}
+  drawPrepare(){}
+	prepare(_state){
+		switch(_state.name){
+			case "eyecatch":
+			  this.data = new Stagedata(_state.stageNumber); // stageNumberによりステージを生成。
+				this.stageNumber = _state.stageNumber; // まあdataに入ってるけど一応ね
+				this.difficulty = _state.difficulty; // 難易度が無いとパドルを作れない
+				break;
+		}
+		// どっちからくるにしてもresetは必須
+		this.ball.reset();
+		this.paddle.reset();
+	}
+  keyAction(code){
+		// マウス操作だから特に・・
+	}
+	update(){
+	}
+	draw(){}
+}
+*/
+
+ゲームの流れ（Title～Mode）
+Title → Select
+Titleでエンターキー押すとSelectに移行する。おわり。
+Select → Mode, Title
+Selectでは十字キーでレベル（ステージが5つ集まったもの）を選びます
+レベル0～4でエリア0～4ってやる感じ
+ステージはレベル*5+エリアナンバーって感じで。
+レベル、エリア、ステージ
+名前の定義、割と大事。
+セレクトでレベルをセレクト、モードでモードをセレクト。んー・・・
+セレクトでレベルとモードをセレクト？ってやるべき？
+じゃあいっそ「SelectLevel」と「SelectMode」って名前にしちゃえ。
+difficultyはやめてmodeで統一。統一するの大事。
+今までmodeとしていたものは混乱を避けるためchoiceという名前に変更する
+TO TITLEの場合はタイトルに戻る
+Mode → Select, Play
+
+Title → SelectLevel → SelectMode → Play からのPauseとClearとGameoverとScore ですべて。めでたし！
+SelectLevelとSelectModeにおけるカーソルの番号はchoiceという名前で統一
+0ベースで戻る場合は0だけどそれだと1～5とか1～4になっちゃうから渡すときに1を引くのを忘れないこと
+下に戻るを設定してもいいんだけどまあいいやそれは
+レベルごとのステージ番号は・・
+{"level0":{"stage0":~~~, "stage1":~~~, "stage2":~~~, ...}}
+いいや、エリア要らね。レベルとステージで行こう。めんどうでしょ。
+ステージ作るときに(level, stage)でそれぞれ数入れて・・って感じで。
+jsonにはlevelごとのstageごとみたいな感じで入れて選択できるようにするよ。通し番号は、無しで。
+
+こっちは常に複雑さを避けてシンプルにやろうと思ってるんだけどなかなかうまくいかないのよね。
+何でだろうね？？
+
+systemSetupとかいうインチキ処理を抹消
+こういうわけわからんことするからどんどんスパゲティ化していっちゃうんだよ
+ふざけんな
+
+右クリックでボール発射やめます
+普通に左クリックでいいです
+それで、クリックしたあとしばらく（32フレームくらい）クリック出来ないようにすればいいでしょ。それでいけるはず。
+32っていうのは30よりちょっと大きいくらい。パドルのアクティブ時間が30フレームだからそれより大きくないといろいろと不便なので。
+playにclickSpanっていうの持たせて、それが32になって、毎フレーム、正である限り減って、0のときしかクリックが作動しないように。
+
+とりあえずplayまで動くようにするのを目標にします。そのあとのことは、そのあとで。
+
+ライフはボール持ちにしてください。ブロックのhit関数で変化させたいので。いちいち呼び出すのめんどくさい。
+
+つぶつぶだと全く反応されない
+クソが
+やっぱきちんとゲーム作らないとダメね
+でも体壊したらアホみたいだからほどほどにする
