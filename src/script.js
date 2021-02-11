@@ -366,10 +366,13 @@ class GameSystem{
 		this.gr = undefined; // グラフィック
 		this.score = 0;
 		this.mode = 0;
+		this.gutter = new Gutter(); // ガター
 	}
 	setPattern(id){
 		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
 		this.gr = createGraphics(480, 440);
+		const colliders = [new RectCollider(20, 420, 440, 20)];
+		this.gutter.setting(480, 440, colliders);
 	}
 	reset(mode){
 		this.score = 0;
@@ -383,9 +386,99 @@ class GameSystem{
 	}
 	draw(){
 		this.gr.background(0);
+		this.gutter.draw(this.gr);
 	}
 }
 
+class Ball{
+
+}
+
+class Paddle{
+
+}
+
+class Block{
+
+}
+
+// colliderデータを受け取ってそれをもとにgrに描画してベースラインとする、そのうえで当たり判定を提供する流れ。
+// glsl使って描画するのもありなんかなとか思ったり
+class Gutter{
+	constructor(){
+		this.gr = undefined;
+		this.colliders = [];
+	}
+	setting(w, h, colliders){
+		this.gr = createGraphics(w, h);
+		this.gr.noStroke();
+		this.gr.colorMode(HSB, 100);
+		this.colliders = colliders;
+		for(let c of this.colliders){
+			switch(c.type){
+				case "rect":
+				  this.gr.fill(0, 100, 100);
+					this.gr.rect(c.x, c.y, c.w, c.h);
+					break;
+			}
+		}
+	}
+	check(_ball){
+		// 当たり判定
+		for(let c of this.colliders){ if(c.collideWithBall(_ball)){ return true; } }
+		return false;
+	}
+	draw(gr){
+		gr.image(this.gr, 0, 0);
+	}
+}
+
+class Collider{
+	constructor(){
+		this.type = "";
+	}
+	collideWithBall(_ball){}
+	reflect(_ball){}
+}
+
+// 長方形。ガターとパドルとブロックで使う感じ
+// ボールに関してはrectしたりcircleしたりなので別扱いで。
+class RectCollider extends Collider{
+	constructor(x, y, w, h){
+		super();
+		this.type = "rect";
+		this.x = x;
+		this.y = y;
+		this.w = w;
+		this.h = h;
+	}
+	update(x, y){
+		this.x = x;
+		this.y = y;
+	}
+	collideWithBall(_ball){
+
+	}
+	reflect(_ball){
+
+	}
+}
+
+// 厚みが必要。バームクーヘン的な。パドル専用。
+class ArcCollider extends Collider{
+  constructor(){
+		super();
+		this.type = "arc";
+	}
+}
+
+// 円環も用意するか。これはガター専用。処理が煩雑になるので分ける。
+class RingCollider extends Collider{
+	constructor(){
+		super();
+		this.type = "ring";
+	}
+}
 
 function keyPressed(){
   mySystem.currentState.keyAction(keyCode);
