@@ -268,26 +268,51 @@ class Play extends State{
 		super(_node);
 		this.name = "play";
 		this.gameSystem = new GameSystem();
+		this.level = 0;
 		this.stage = 0;
-		this.offSet = {};
+		this.offSet = {}; // ゲームシステム側のグラフィックを表示する際のオフセット
+		this.preAnimationSpan = 60;
+		this.drawPrepare();
 	}
 	drawPrepare(){
 		this.gr.noStroke();
+		this.gr.textSize(64);
+		this.gr.textAlign(CENTER, CENTER);
+		this.gr.textFont(huiFont);
 	}
   prepare(_state){
 		switch(_state.name){
 			case "selectmode":
 			  this.gameSystem.reset(_state.choice - 1); // 1を引くって感じで。mode（難易度）設定。
+				this.level = _state.level; // レベル番号要るかな・・んー
 				this.stage = 0; // ステージ番号リセット
 				break;
 		}
-		this.gameSystem.setPattern(_state.level * 5 + this.stage); // レベルとステージからレベル*5＋ステージで番号(0～24)
-		this.offSet = this.gameSystem.getOffSet();
+		this.gameSystem.setPattern(this.level * 5 + this.stage); // レベルとステージからレベル*5＋ステージで番号(0～24)
+		this.offSet = this.gameSystem.getOffSet(); // オフセットを計算する
+
+		this.preAnimationSpan = 60; // 0になるまでいろいろキャンセルしてステージ番号を表示
   }
   keyAction(code){} // キーイベント
 	clickAction(){} // マウスクリックイベント
-	update(){}
+	update(){
+		if(this.preAnimationSpan > 0){
+			this.preAnimationSpan--;
+			return;
+		}
+	}
+	showPreAnimation(){
+		this.gr.background(0);
+		this.gr.fill(255);
+		this.gr.text("STAGE " + this.level + "-" + this.stage, CANVAS_W * 0.5, CANVAS_H * 0.5);
+		image(this.gr, 0, 0);
+	}
 	draw(){
+		if(this.preAnimationSpan > 0){
+			this.showPreAnimation();
+			return;
+		}
+		this.gameSystem.draw(); // システム側のdraw.
 		this.gr.background(128);
 		this.gr.image(this.gameSystem.gr, this.offSet.x, this.offSet.y);
 		image(this.gr, 0, 0);
@@ -343,8 +368,8 @@ class GameSystem{
 		this.mode = 0;
 	}
 	setPattern(id){
+		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
 		this.gr = createGraphics(480, 440);
-		this.gr.background(0);
 	}
 	reset(mode){
 		this.score = 0;
@@ -357,7 +382,7 @@ class GameSystem{
 
 	}
 	draw(){
-
+		this.gr.background(0);
 	}
 }
 
