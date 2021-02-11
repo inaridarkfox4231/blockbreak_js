@@ -7,6 +7,7 @@
 let mySystem;
 const CANVAS_W = 800;
 const CANVAS_H = 600;
+const GRIDSIZE = 20;
 
 // KEYCODE定数
 const K_ENTER = 13;
@@ -367,12 +368,17 @@ class GameSystem{
 		this.score = 0;
 		this.mode = 0;
 		this.gutter = new Gutter(); // ガター
+		this.blocks = []; // ブロック
 	}
 	setPattern(id){
 		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
 		this.gr = createGraphics(480, 440);
+		this.gr.noStroke();
 		const colliders = [new RectCollider(20, 420, 440, 20)];
 		this.gutter.setting(480, 440, colliders);
+		this.blocks = [];
+		this.blocks.push(new Block(0, 3, 1, 19));
+		this.blocks.push(new Block(23, 3, 1, 19));
 	}
 	reset(mode){
 		this.score = 0;
@@ -387,6 +393,7 @@ class GameSystem{
 	draw(){
 		this.gr.background(0);
 		this.gutter.draw(this.gr);
+		for(let b of this.blocks){ b.draw(this.gr); }
 	}
 }
 
@@ -398,8 +405,29 @@ class Paddle{
 
 }
 
+// NORMALとLIFEUPとWALL. まあとりあえずWALLかな
 class Block{
-
+	constructor(gridX, gridY, gridW, gridH, blockType = WALL, tough = Infinity){
+		this.x = gridX * GRIDSIZE;
+		this.y = gridY * GRIDSIZE;
+		this.w = gridW * GRIDSIZE;
+		this.h = gridH * GRIDSIZE;
+		this.blockType = blockType;
+		this.tough = tough;
+	}
+	draw(gr){
+		const diff = GRIDSIZE * 0.2;
+		switch(this.blockType){
+			case WALL:
+			  gr.fill(180);
+				gr.rect(this.x, this.y, this.w, this.h);
+				gr.fill(60);
+				gr.rect(this.x + diff, this.y + diff, this.w - diff, this.h - diff);
+				gr.fill(120);
+				gr.rect(this.x + diff, this.y + diff, this.w - diff * 2, this.h - diff * 2);
+				break;
+		}
+	}
 }
 
 // colliderデータを受け取ってそれをもとにgrに描画してベースラインとする、そのうえで当たり判定を提供する流れ。
