@@ -1,0 +1,604 @@
+はい
+作り方を根本的に見直さないと今後何も作れなくなる
+見直そう、すべて。
+ブロック崩しも作れないんじゃ何にも作れない
+あとUnityじゃなくていいから何かしらゲームの形にしたい
+フリーゲームとして遊んでもらうとか
+ツクール系とかも考えた方がいいかも
+
+前振り終わり。
+本題。
+タイトル画面でエンターキー押すとセレクトレベル
+セレクトレベルでレベルを選択するとセレクトモードに移行
+セレクトモードでモードを選択するとプレイに行く
+
+モードからプレイに来た時にやること
+レベルの最初に行なう処理とステージの最初に行なう処理
+
+プロパティはどうやって用意するんだっけ・・・
+
+骨組みだけ作ってから足していくっていう作り方をしたいのよね
+
+パドルと、・・・パドルだけ？でいいのか。
+もっというとブロックだけとか。
+あんまシンプルにしすぎるとあれこれ付け加えにくくなるんだけどね
+だからその余地を踏まえたうえでシンプルに書いてそれから肉付きを整えていくって流れ。
+
+/*
+// というわけでバッサリカット。EyecatchとStartは要らないということで。
+
+// PlayにはMode,Pause,Clearからくる可能性があるわけです。
+// PlayからはPause,Gameover,Clear,Allclearに行きます。
+// 最初に準備段階があってその間は・・うーん。ステージコールは別ステートにするか・・情報だけ付与して。その方がdraw場合分けしなくて済む。
+// あと発射段階って絵面はPlayのやつ横取りすればいい、Pauseみたいに。で、パドル動かしてボール・・そうね・・
+
+// Modeからくる
+// Modeから来た時のstageNumberはlevel*5-4で最終的にlevel*5までいく
+// lifeとscoreについては基本的にgameSystemの方でいろいろやる
+// stage==0に場合にスコアリセットとライフ設定を行なう（1以上のときはしない）
+class Play extends State{
+	constructor(_node){
+		super(_node);
+		this.name = "play";
+    this.gameSystem = new GameSystem();
+		this.level = 0;
+		this.stage = 0; // 0,1,2,3の場合は1つ増やして4の場合は次へ。
+		this.mode = 0;
+		this.offSetX = 0; // gameSystem.grをこっちのgrに貼り付ける際のオフセット。とはいえまあ単純に
+		this.offSetY = 0; // gameSystem.grが中央にくるように計算で出すんだけどね。widthとheight分かるし。
+		this.clickActionWaitCount = 0; // 32
+	}
+	calcOffSet(){
+		let ggr = this.gameSystem.gr;
+		const w = ggr.width;
+		const h = ggr.height;
+		this.offSetX = (CANVAS_W - w) * 0.5;
+		this.offSetY = (CANVAS_H - h) * 0.5;
+		// これでいい。
+	}
+  drawPrepare(){
+		// といってもメイン描画はgameSystem側でやるので、ここではせいぜい背景をあれするくらい。
+		// レンガとか三角形とか青海波とかモノクロで並べたら面白そう。工字繋ぎとか。
+		this.gr.clear(); // もうしわけていどに
+	}
+	prepare(_state){
+		switch(_state.name){
+			case "selectMode":
+			  this.stage = 0;
+				this.level = _state.level;
+				this.mode = _state.choice - 1; // 1～4で変換して0～3にする感じ
+				this.gameSystem.setPattern(this.level, this.stage, this.mode); // initialize()とかもろもろもここでやる感じ
+				this.calcOffSet(); // ここでオフセットを計算
+			  break;
+			case "clear":
+			  // this.stage++して5より小さい時こっちに飛ばされる。
+			  this.gameSystem.setPattern(this.level, this.stage, this.mode); // はじめに来た時と同じように初期化
+			  break;
+			case "pause":
+			  break;
+		}
+	}
+  keyAction(code){
+		// Playにおいてキーで何か操作することはないかな・・ていうか十字キーでパドル動かすの辛いんだよ、ほんとに。
+		// それが嫌でマウスにした経緯がある。難しいステージが作れないからってことで。マウスなら自由自在だから。その分難しくできる。
+	}
+	clickAction(){
+		if(this.clickActionWaitCount === 0){
+			// きちんと実行できたらtrueを返す
+			if(this.gameSystem.clickAction()){ this.clickActionWaitCount = 32; }
+		}
+	}
+	update(){
+		if(this.clickActionWaitCount > 0){ this.clickActionWaitCount--; }
+		this.gameSystem.update();
+	}
+	draw(){
+		this.gameSystem.draw();
+		this.gr.background(0);
+		this.gr.image(this.gameSystem.gr, this.offSetX, this.offSetY);
+	}
+}
+
+class Pause extends State{
+	constructor(_node){
+		super(_node);
+		this.name = "pause";
+	}
+  drawPrepare(){}
+	prepare(_state){}
+  keyAction(code){}
+	update(){}
+	draw(){}
+}
+
+class Gameover extends State{
+	constructor(_node){
+		super(_node);
+		this.name = "gameover";
+	}
+  drawPrepare(){}
+	prepare(_state){}
+  keyAction(code){}
+	update(){}
+	draw(){}
+}
+
+class Clear extends State{
+	constructor(_node){
+		super(_node);
+		this.name = "clear";
+	}
+  drawPrepare(){}
+	prepare(_state){}
+  keyAction(code){}
+	update(){}
+	draw(){}
+}
+
+class Score extends State{
+	constructor(_node){
+		super(_node);
+		this.name = "score";
+	}
+  drawPrepare(){}
+	prepare(_state){}
+  keyAction(code){}
+	update(){}
+	draw(){}
+}
+
+// ゲーム関連もろもろはここに統一させる
+// エディタではブロックを置ける場所にブロックを置くだけ。プリセットも用意しておく。数多くないし楽でしょ。
+class GameSystem{
+	constructor(){
+		this.level = 0;
+		this.stage = 0;
+		this.mode = 0;
+		this.score = 0;
+		// this.life = 0; // ライフはボールに持たせる
+		// ゲームの要素
+		this.paddles = []; // 0番にボールを乗せるパドルを設置する感じで。
+		this.ball = new Ball();
+		this.blocks = [];
+		this.gutter = new Gutter(); // こっちのgrにガターを描画する関数と、ボールをアウトにする判定関数持ってる。
+		this.gr = undefined; // データを元にgrを作って・・
+		this.openingAnimationSpan = 0; // これが正の間にスタート時のアニメを完了させる（60フレーム）
+		// これはもうあれ、アップデートとか後回しで、うん。。そうしよう？
+		// ポインター関連
+		// this.ball.isActive()がfalseのときはこれを元にこういうのを描画
+		// クリックが為されたらボールをアクティベートしてね
+		// これ全部要らんね。
+		//this.drawPointer = () => {}; // ポインターの描画（円弧と矢印）
+		//this.properFrameCount = 0; // と、それに使うカウンターです。この値を元に方向を指定しますね。
+		//this.calcDirection = () => {}; // マウス位置とproperFrameCountからボールの方向を計算する関数のはず。引数はボール。
+	}
+	initialize(mode){
+		// レベルの最初に行なう処理
+		this.score = 0;
+		this.mode = mode; // モードを設定
+		const lifeArray = [3, 5, 10, 15];
+		this.ball.setLife(lifeArray[mode]);
+	}
+	clickAction(){
+		if(this.openingAnimationSpan > 0){ return false; } // 実行出来なかったのでfalseを返す
+		// ゲームシステムにおけるアクション。えーと、具体的には「発射」と「パドル活性化」です。
+		// 複数の場合は全部いっぺんに活性化する。全部いっぺんに色が変わる。
+		if(!this.ball.isActive()){
+			this.ball.activate();
+			this.properFrameCount = 0;
+			return true;
+		}
+		return true;
+	}
+	setPattern(level, stage, mode){
+		if(stage === 0){ this.initialize(mode); } // ここでやるのはパドル用意するとかそういうの
+		this.paddles = [];
+		this.blocks = [];
+		// 与えられたwとhに基づいてthis.grを生成してね！！
+		this.gr = createGraphcis(480, 440); // とりあえずね。440は20+360+60です。python版が480x400(=360+40)ベースなので。20はガター。
+		// パドルを作ってね（パターンごとに固定）
+		// マウス位置を実際の位置に変換する関数が要る
+		// LinePaddleとArcPaddleの2種類を作るつもり。マウス位置をパラメータに変換し、パラメータを元に描画し(gr渡して描かせる)、
+		// パラメータを元にボールとの衝突判定をし速度を変更する。それら3種類の関数と、modeによる長さ指定、これで生成する。
+		// とりあえずLinePaddleだけ作ります
+		// 衝突についてはパラメータの情報を元に、ボールの情報と合わせて、パドル側で、やります。
+		// 温泉入ってるときに頭の中でちゃちゃっとね、まあ実装は、大変でしょうね・・・
+		// drawFuncはパラメータあれば描画できるから要らないだろってなくしちゃった
+		// modeもsetParamFuncにモード情報入ってるからってことでなくしちゃった
+    const widthArray = [80, 60, 40, 30];
+		const paddleWidth = widthArray[mode];
+		let setParamFunc = (mx, my, _paddle) => {
+			const x = constrain(mx, 20 + paddleWidth * 0.5, 460 - paddleWidth * 0.5);
+			const y = 480 - 20 - 2;
+			_paddle.param = {x:x, y:y, w:paddleWidth, h:4};
+		}
+		this.paddles.push(new LinePaddle(setParamFunc));
+		// ボールをいじってね. ボールが落ちるたびにパドルに再配置する、その際にマウス位置に応じて動くんで、それをね・・
+		// パドルに対してだといろいろと問題があるので個別の関数で動かしちゃおう。まあ、似たようなのを渡すわけさ・・
+		// ボールもgr渡して描かせる
+		this.ball.initialize(setPosFunc);
+		this.ball.reset(); // リセットは同じステージ内でやられるたびに行うけどね
+
+    // パドルとボールの移動関数はmodeによる。modeの情報を元に関数を作り渡せばよい。
+		// だからボールがパドルの幅情報を持つ必要もないわけね。
+
+		// ブロック用意してね（パターンごとのブロックとエディタで編集できるのとそれぞれ）
+		// まずNORMALかLIFEUPかWALLか指定、まあ基本WALLだけども。
+		// gridX,gridY,gridW,gridH,blockType(=WALL),tough(=Infinity)って感じ。
+		// つまりWALLが多いので、ほとんどはWALLでInfinity, そうでないのをね、あれする。gridSizeは20だからそれで割った値を指定してる。
+		// で、絶対座標です。なので基本gridYは3以上となります。上60は予約スペースなので。
+		// NORMALをすべて壊したらクリアですね。WALLは壊せないし、LIFEUPは壊さなくてもOKです。
+		// ブロックとボールの衝突判定はGameSystem側が持ってる関数を使います。その結果については・・hit関数を
+		// それぞれに持たせて（ボールとブロックに持たせて）対処。いろいろ起こるので。
+		// ブロックもgr渡して描かせる（おい）
+		this.blocks.push(new Block(0, 3, 1, 19), new Block(23, 3, 1, 19), new Block(1, 3, 22, 1),
+		                 new Block(7, 7, 2, 1, NORMAL, 1));
+		// ガター用意してね。描画のための関数と、あ、gr渡して描かせるの。checkFuncは要するにもろもろ、速度更新、移動させた後で
+		// ガターとぶつかるようならそこでアウトの判定を出してもらうわけね。
+		let drawFunc = (gr) => {
+			gr.fill(255, 0, 0);
+			gr.rect(20, 420, 440, 20);
+		}
+		let checkFunc = (_ball) => {
+			// 矩形の場合は_ballを正方形とみなして判定してOK.
+			if(this.x + 8 < 20 || this.x - 8 > 440){ return false; }
+			if(this.y + 8 < 420 || this.y - 8 > 440){ return false; }
+			return true;
+		}
+		this.gutter.initialize(drawFunc, checkFunc);
+		// おけ！
+		this.openingAnimationSpan = 60; // これが0になってからもろもろ始まる感じで。
+	}
+	update(){
+		if(this.openingAnimationSpan > 0){ this.openingAnimationSpan--; return; } // 0になるまでこれしかやらない
+		this.paddles.update(); // パドル動かすならここでね
+		if(!this.ball.isActive()){
+			// ボールがアクティブでない場合は
+			this.calcDirection(this.ball, this.properFrameCount);
+			this.properFrameCount++;
+		}
+
+		// パドルを動かします
+		// ブロックとの衝突を調べて場合によっては速度いじります（高々1個まで）
+		// パドルとの衝突を調べて場合によっては速度いじります（配置により高々1個まで）
+		// ボールの位置更新
+		// 更新された位置に対してガーターとの接触を調べます
+		// 接触が検出されたら然るべき処理をしてボールをresetするのとあとライフ減らす処理
+		// ライフが0になるようならゲームオーバーに移行
+	}
+	draw(){
+		// やることいっぱい
+		// 黒で初期化
+		// 上の方にライフとスコアとステージ番号描画
+		// ライフはバーの長さで表現し0になったら終わり、
+		// 縦60で横はステージ幅
+		// 30ずつにわけて左上に0-0とか4-3とかステージ、左下にスコア、その右側スペースにライフ（30x30の白い円を2列に並べる）
+		// ライフの円は12個まで並べたら下の段、まあそんな増えないだろうけど。調整します。（24個までしか置けないように）
+		// 横幅の下限が480だからスコアとステージに120くらい割いて残り360でそれをやる。数字は18x30だから108x30でおけ。
+		// SCOREの文字は入らないので数字だけ。あと空欄は0で埋める、あとその上に[4-4]って感じでやるね。
+		// 気付いたけどLIFEの文字も入らないな。まあ分かるでしょ。
+		// ガター描画 → ブロック描画 → パドルたち描画 → ボール描画 で、おわり？
+		// 基本はそれだけ。
+		// それに加えてボールがアクティブでない場合はポインタを描画する
+		if(this.openingAnimationSpan > 0){
+			this.gr.background(0);
+			this.gr.fill(255);
+			this.gr.textSize(64);
+			this.gr.textAlign(CENTER, CENTER);
+			this.gr.text("STAGE 0-0", this.gr.width * 0.5, this.gr.height * 0.5);
+			return;
+		}
+
+	}
+}
+
+// ボール、パドル、ブロック
+
+// ボール
+// 大きさは全部一緒でStart用とPlay用に2つインスタンス作る。Startの方はボールが発射されるまで表示
+// サイズ16x16 円だけど判定はrectで行なう。その方が楽。
+// スピードは通常時が4で加速時が6だそうです
+// 通常時灰色、加速時オレンジ色。加速時はスピード速いからぶっちゃけ色区別要らないし。んー。
+// グラフィックは中央に向けて白く。具体的にはfill(255, 128 + i * 8, 0)でi:0～16で半径16～0で。
+// 通常時はfill(128 + i * 8)でi:0～16で半径16～0で。最初にリスト用意して切り替える。
+class Ball{
+  constructor(){
+		// x, yはもちろん中心の座標
+		this.x = 0;
+		this.y = 0;
+		this.speed = 4; // speedとdirectionで位置更新するか
+		this.life = 0; // ライフはこっち持ちで。アウトになるたびに減らし、0になったらplayの方でゲームオーバー判定する感じ
+		this.direction = 0;
+    // もうめんどくさい
+		// 白とオレンジ
+		// 以上！！！
+		this.active = false; // フラグ。falseなら待機中ということ、trueなら飛び回ってるということ。
+		this.alive = true; // フラグ。下に落ちた時にtrueとなりやられた判定が発生してStartに戻る流れ。
+		this.attack = 1; // 攻撃力。速度が変化するときに2になり、戻るときに1になる、みたいな感じで変化。
+		this.powerLevel = 0; // 0か1だけどね。今後の事考えると、段階があること前提で書いた方がいいと思う。
+		this.poweredLimit = 0; // パワード状態の持続時間。300フレーム、つまり5秒間が限界ね。
+
+		this.setPosFunc = () => {}; // 待機時にマウス位置を存在位置に変換する為の関数。
+	}
+	initialize(setPosFunc){
+		this.setPosFunc = setPosFunc;
+	}
+	isActive(){
+		return this.active;
+	}
+	reset(){
+		// この辺はStartにくるたび毎回やる
+		this.speed = 4;
+		this.direction = 0;
+		this.active = false;
+		this.alive = true;
+		this.attack = 1;
+		this.powerLevel = 0;
+		this.poweredLimit = 0;
+	}
+	getLife(){
+		return this.life;
+	}
+	setLife(lifeValue){
+		this.life = lifeValue;
+	}
+  lifeChange(diff){
+		// 増やすのも減らすのもメソッド経由で
+		this.life += diff;
+	}
+	setPos(x, y){
+		this.x = x;
+		this.y = y;
+	}
+	setSpeed(_speed){
+		this.speed = _speed;
+	}
+	setDirection(_direction){
+		this.direction = _direction;
+	}
+	activate(){
+		// クリックによりアクティブになるそこら辺の処理
+		this.active = true;
+
+	}
+	powerUp(){
+		// いろいろ強くする（この処理はパドルの衝突んとこで実行される）
+		this.attack++;
+		this.speed += 2;
+		this.poweredLimit = 300;
+		this.powerLevel++;
+	}
+	powerDown(){
+		// いろいろ元に戻す
+		this.attack--;
+		this.speed -= 2;
+		this.powerLevel--;
+	}
+	update(){
+		// wait時はsetPosFuncに従うが飛び出した後は反射で位置が変わる感じ・・んー。
+		// 基本的に速度を足す。そして速度は衝突により変化する。ここで速度を足すのはあくまでそのあとってわけね。
+		// パドルとの衝突では速度が変化する場合もあるし。
+		// wait中ならその処理は無いからsetPosFuncに任せて終わり。
+	  if(!this.active){
+			this.setPosFunc(this);
+			return;
+		}
+		if(this.poweredLimit > 0){
+			this.poweredLimit--;
+			if(this.poweredLimit === 0){ this.powerDown(); }
+		}
+		this.x += this.speed * Math.cos(this.direction);
+		this.y += this.speed * Math.sin(this.direction);
+	}
+	draw(gr){
+		// grに画像を貼り付ける
+		gr.noStroke();
+		if(this.powerLevel < 1){ gr.fill(255); }else{ gr.fill(255, 128, 0); }
+		gr.circle(this.x, this.y, 16);
+	}
+}
+
+// パドル
+// 白と黄色。幅は4で統一。で、表示位置とかそこら辺は全部関数渡して解決する流れで。
+// パラメータもLinePaddleとArcPaddleで必要なものが全然違うのでそこら辺も含めて。
+// LinePaddleの場合は中心座標であと幅。縦だったり横だったり。Arcの場合中心とかいろいろ。
+// 当たり判定にしてもLineならrect判定でArcなら円を使う、という風に分けて処理する。
+// 要するにステージごとに全然違うから関数渡して個別に処理しちゃおうってわけね。
+
+// なお描画にはlineやarcでstrokeWeight4にしてやります（バームクーヘン問題を回避！）
+class Paddle{
+	constructor(setParamFunc){
+	  //this.mode = 0; // 難易度情報。主に衝突で使う・・というか要らないかなぁパラメータ決めるときmode情報使うし
+		this.active = false; // 左クリックでアクティブに・・drawFuncでこの情報を元に色決めるからmode要らんね・・
+		this.count = 0; // アクティブ状態の持続時間は30フレーム
+		this.setParamFunc = setParamFunc;
+		// this.drawFunc = drawFunc; // パラメータさえあれば描画関数要らなくないか？
+		this.ball = undefined; // ボールを持たせる
+		this.properFrameCount = 0; // カウント？
+	}
+	setBall(_ball){
+		// ボールをセットする
+		this.ball = _ball;
+	}
+	removeBall(){
+		this.ball = undefined;
+	}
+	reset(){
+		// Startにくるたびに毎回やるのはこんなところかな
+		// 他にやることないだろ
+		this.active = false;
+		this.count = 0;
+	}
+	activate(){
+		// とりあえずactivateだけ関数化しておくか
+		this.count = 30;
+		this.active = true;
+	}
+	update(){
+		if(this.count > 0){
+			this.count--;
+			if(this.count === 0){ this.active = false; }
+		}
+		this.setParamFunc(mouseX, mouseY, this); // マウス位置により位置パラメータを決める
+	}
+	draw(gr){}
+}
+
+class LinePaddle extends Paddle{
+  constructor(setParamFunc, w, h, direction){
+		super(setParamFunc);
+		this.x = 0;
+		this.y = 0;
+		this.w = w;
+		this.h = h;
+		this.reflector = new RectReflector(w, h);
+		this.direction = direction; // 待機中のボールの位置の計算。
+	}
+	adjustBall(){
+		if(this.ball === undefined){ return; }
+		_ball.setPos(this.x + this.w * 0.5 * Math.cos(this.direction), this.y + this.h * 0.5 * Math.sin(this.direction));
+	}
+	draw(gr){
+		gr.noStroke();
+		// パラメータに依りけり
+	}
+}
+
+class ArcPaddle extends Paddle{
+// 今はやらないよ
+}
+
+// 面倒なのでこれでいいです
+class Reflector{
+	constructor(){}
+	collideWithBall(_ball){}
+	reflect(_ball){}
+}
+
+// んー。
+// いいよ。コンストラクタ・・いいよ。
+class RectReflector extends Reflector{
+	constructor(){
+		super(w, h);
+		// x, yは中心座標(x, y)でwとhが横幅縦幅
+		this.x = 0;
+		this.y = 0;
+		this.w = w;
+		this.h = h;
+	}
+	update(x, y){
+		// xとy以外は変えないので。
+		this.x = x;
+		this.y = y;
+	}
+	collideWithBall(_ball){
+		if(_ball.x + 8 < this.x - this.w * 0.5 || this.x + this.w * 0.5 < _ball.x - 8){ return false; }
+		if(_ball.y + 8 < this.y - this.h * 0.5 || this.y + this.h * 0.5 < _ball.y - 8){ return false; }
+		return true;
+	}
+	reflect(_ball){
+		// 衝突してることが前提の反射処理
+		// _ballの中心がどこにあるかを見る。
+		if(abs(_ball.x - this.x) < this.w * 0.5){
+			// 上下サイド
+			_ball.setDirection(Math.PI - _ball.direction); return;
+		}
+		if(abs(_ball.y - this.y) < this.h * 0.5){
+			// 左右サイド
+			_ball.setDirection(-_ball.direction); return;
+		}
+		// 角の場合
+		let centerDir = 0;
+		const jx = (_ball.x > this.x ? 0 : 1);
+		const jy = (_ball.y > this.y ? 0 : 1);
+		if(jx === 0 && jy === 0){ centerDir = Math.PI / 4; }
+		if(jx === 1 && jy === 0){ centerDir = Math.PI * 3 / 4; }
+		if(jx === 1 && jy === 1){ centerDir = Math.PI * 5 / 4; }
+		if(jx === 0 && jy === 1){ centerDir = Math.PI * 7 / 4; }
+		_ball.setDirection(centerDir + (Math.random() * 2 - 1) * Math.PI / 12);
+	}
+}
+
+class ArcReflector extends Reflector{
+	constructor(cx, cy, r, l){
+		super();
+		// cx, cy, r, l, t1, t2ですね。t1～t2って感じで。t1からt2までの弧だね。
+		this.cx = cx;
+		this.cy = cy;
+		this.r = r;
+		this.l = l;
+		this.t1 = 0;
+		this.t2 = 0;
+	}
+	update(t){
+		// cxもcyもrもlも不変。
+		this.t1 = t - (this.l / this.r) * 0.5;
+		this.t2 = t + (this.l / this.r) * 0.5;
+	}
+	collideWithBall(_ball){
+		// 今はいいです
+	}
+	reflect(_ball){
+		// 今はいいです
+	}
+}
+
+// ブロック
+// 色は2段階で。？3段階。
+// life1:白、life2:薄い青、life3:濃い青。で、通常アタックがダメージ1で、薄い青→白→消える、って感じで。
+// それで、高速アタックはダメージ2.lifeが3以上の場合は2以上のダメージを一度に与えないと減らないみたいにする感じで。
+// つまり3が1になって白くなるわけね。2回で消える、ただし1回目は高速限定。つまりNORMALとかHARDとか廃止で。
+// NORMALとLIFEUPとWALLの3種類とする。
+// NORMALはlifeで分けて3段階で白、薄い青、濃い青でLIFEUPはlife1でピンクで黒い字で「L」書く、WALLは灰色で厚みを変える。
+// 厚みは2と5で区別。
+class Block{
+	constructor(gridX, gridY, gridW, gridH, blockType = WALL, tough = Infinity){
+		this.x = gridX * 20;
+		this.y = gridY * 20;
+		this.w = gridW * 20;
+		this.h = gridH * 20;
+		this.blockType = blockType; // a0とかd4とかkとか
+		this.tough = tough; // HPに相当する値。壊せない場合はInfinityを設定。
+		// 分裂するかどうかっていうフラグを用意するかどうかって話。
+		// 40x40でNORMALでtoughが1のときに通常アタックを受ける、という条件が満たされればspreadFlag = trueとして
+		// gameSystem側で排除するときに小さいブロックを4つ追加する形でっていう、そういうの。
+		// 応用すれば60x60とかでも・・つまり縦横共に40以上なら何でも、ってやることもできそうな？
+	}
+	hit(_ball){
+		// ボールとヒットした時のあれこれ。ボールが速い時に色々とね・・
+		// 面倒でもボールのスピードと攻撃力を区別。まあ、1か2だけど。で、NORMALでダメージ受けると普通に減るが、
+		// 3の場合は1では減らず2でないとだめ、です。はい。で、LIFEUPなら_ballのライフ・・？
+		// やっぱライフはボールに持たせた方がいいか。うん。でないとめんどくさそう。
+		// WALLの場合何も起きない。速度変更はこっちでやらないし。てか速度はタイプに依らず変えるし。
+	}
+	draw(gr){
+		// blockTypeとtoughで異なる。WALLは灰色ベースで太いbevel, NORMALは白か薄い青か濃い青、LIFEUPはピンクベースで。
+	}
+}
+
+// ガターです
+// 赤いのを・・
+// シェーダでなんかいじるのもありかなとか思ったり（例のマグマとか）
+// そしたら背景は雲とか？
+// これクラスの意味あるん？？まあこんなもんでしょ。パターン化できないんだよ。まとめておくってだけの話。
+class Gutter{
+	constructor(){
+		this.drawFunc = () => {};
+		this.checkFunc = () => {};
+	}
+	initialize(drawFunc, checkFunc){
+		this.drawFunc = drawFunc;
+		this.checkFunc = checkFunc;
+	}
+	check(_ball){
+		// _ballがガターにアレしてるか見て、してたらtrue返してね。してなかったらfalse返してね。
+		return this.checkFunc(_ball);
+	}
+	draw(gr){
+		// grにガター描いてよね
+		this.drawFunc(gr);
+	}
+}
+
+
+*/
