@@ -301,6 +301,7 @@ class Play extends State{
 			this.preAnimationSpan--;
 			return;
 		}
+		this.gameSystem.update();
 	}
 	showPreAnimation(){
 		this.gr.background(0);
@@ -379,6 +380,13 @@ class GameSystem{
 		this.blocks = [];
 		this.blocks.push(new Block(0, 3, 1, 19));
 		this.blocks.push(new Block(23, 3, 1, 19));
+		this.blocks.push(new Block(1, 3, 22, 1));
+		this.blocks.push(new Block(8, 8, 2, 1, NORMAL, 1));
+		this.blocks.push(new Block(8, 6, 2, 1, NORMAL, 2));
+		this.blocks.push(new Block(8, 12, 2, 1, NORMAL, 3));
+		this.blocks.push(new Block(13, 8, 1, 2, LIFEUP, 1));
+		this.paddles = [];
+		this.paddles.push(new LinePaddle(20, 420, 416, 416, 40, 4, -PI/2));
 	}
 	reset(mode){
 		this.score = 0;
@@ -388,12 +396,15 @@ class GameSystem{
 		return {x:(CANVAS_W - this.gr.width) * 0.5, y:(CANVAS_H - this.gr.height) * 0.5};
 	}
 	update(){
-
+		const mx = constrain(mouseX / CANVAS_W, 0, 1);
+		const my = constrain(mouseY / CANVAS_H, 0, 1);
+		this.paddles[0].move(mx, my);
 	}
 	draw(){
 		this.gr.background(0);
 		this.gutter.draw(this.gr);
 		for(let b of this.blocks){ b.draw(this.gr); }
+		for(let pdl of this.paddles){ pdl.draw(this.gr); }
 	}
 }
 
@@ -401,7 +412,37 @@ class Ball{
 
 }
 
+// 0～1のマウス値から位置を出す
 class Paddle{
+	constructor(){
+	  this.ball = undefined;
+		this.activeCount = 0; // クリックで60になり減っていくが30より大きい間だけアクティブでその間にボール弾くとpowerupする
+	}
+}
+
+class LinePaddle extends Paddle{
+	constructor(x1, x2, y1, y2, w, h, direction){
+		super();
+		this.xRange = [x1, x2];
+		this.yRange = [y1, y2];
+		this.x = 0;
+		this.y = 0;
+		this.w = w;
+		this.h = h;
+		this.direction = direction; // ボールが存在する方向（PI/2とか-PI/2とかそういうの）
+	}
+	move(mx, my){
+		// mx, myは0～1の値でCANVAS_WやCANVAS_Hでconstrainされたマウス値でそれを元に位置を決める
+		this.x = this.xRange[0] * (1 - mx) + this.xRange[1] * mx;
+		this.y = this.yRange[0] * (1 - my) + this.yRange[1] * my;
+	}
+	draw(gr){
+		gr.fill(255);
+		gr.rect(this.x, this.y, this.w, this.h);
+	}
+}
+
+class ArcPaddle extends Paddle{
 
 }
 
@@ -415,16 +456,27 @@ class Block{
 		this.blockType = blockType;
 		this.tough = tough;
 	}
+	orthodoxDraw(gr, ratio, col1, col2, col3, round = 0){
+		// 1UPは丸っこくする
+		const diff = ratio * GRIDSIZE;
+		gr.fill(...col1);
+		gr.rect(this.x, this.y, this.w, this.h, round);
+		gr.fill(...col2);
+		gr.rect(this.x + diff, this.y + diff, this.w - diff, this.h - diff, round);
+		gr.fill(...col3);
+		gr.rect(this.x + diff, this.y + diff, this.w - diff * 2, this.h - diff * 2, round);
+	}
 	draw(gr){
-		const diff = GRIDSIZE * 0.2;
 		switch(this.blockType){
 			case WALL:
-			  gr.fill(180);
-				gr.rect(this.x, this.y, this.w, this.h);
-				gr.fill(60);
-				gr.rect(this.x + diff, this.y + diff, this.w - diff, this.h - diff);
-				gr.fill(120);
-				gr.rect(this.x + diff, this.y + diff, this.w - diff * 2, this.h - diff * 2);
+			  this.orthodoxDraw(gr, 0.3, [180, 180, 180], [60, 60, 60], [120, 120, 120]);
+				break;
+			case NORMAL:
+			  const diff = (this.tough - 1) * 80;
+			  this.orthodoxDraw(gr, 0.15, [240 - diff, 250 - diff, 250], [160 - diff, 200 - diff, 250], [200 - diff, 230 - diff, 255]);
+				break;
+			case LIFEUP:
+			  this.orthodoxDraw(gr, 0.3, [250, 140, 170], [230, 0, 74], [255, 72, 132], GRIDSIZE * 0.5);
 				break;
 		}
 	}
