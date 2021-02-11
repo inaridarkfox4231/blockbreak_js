@@ -294,8 +294,12 @@ class Play extends State{
 
 		this.preAnimationSpan = 60; // 0になるまでいろいろキャンセルしてステージ番号を表示
   }
-  keyAction(code){} // キーイベント
-	clickAction(){} // マウスクリックイベント
+  keyAction(code){
+		// シフトキーでボールの位置が変わるかも
+	}
+	clickAction(){
+		this.gameSystem.clickAction();
+	}
 	update(){
 		if(this.preAnimationSpan > 0){
 			this.preAnimationSpan--;
@@ -398,10 +402,20 @@ class GameSystem{
 	getOffSet(){
 		return {x:(CANVAS_W - this.gr.width) * 0.5, y:(CANVAS_H - this.gr.height) * 0.5};
 	}
+	clickAction(){
+		// ボールがnonActive: activateしておわり。active:すべてのパドルをactivateする
+		if(!this.ball.isActive()){
+			for(let pdl of this.paddles){ pdl.removeBall(); }
+			this.ball.activate();
+		}else{
+			for(let pdl of this.paddles){ pdl.activate(); }
+		}
+	}
 	update(){
 		const mx = constrain(mouseX / CANVAS_W, 0, 1);
 		const my = constrain(mouseY / CANVAS_H, 0, 1);
-		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); }
+		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); pdl.update(); }
+		this.ball.update();
 	}
 	draw(){
 		this.gr.background(0);
@@ -429,6 +443,9 @@ class Ball{
 		this.level = 0;
 		this.attack = 1;
 	}
+	isActive(){
+		return this.active;
+	}
 	activate(){
 		this.active = true;
 		this.nonActiveFrameCount = 0;
@@ -448,6 +465,8 @@ class Ball{
 			this.nonActiveFrameCount++;
 			return;
 		} // 位置も方向もこっちでは決めない
+		this.x += this.speed * cos(this.direction);
+		this.y += this.speed * sin(this.direction);
 	}
 	draw(gr){
 		gr.fill(128);
@@ -471,11 +490,25 @@ class Paddle{
 		this.activeCount = 0; // クリックで60になり減っていくが30より大きい間だけアクティブでその間にボール弾くとpowerupする
 		this.direction = 0; // lineとarcで若干違う感じ
 	}
+	activate(){
+		if(this.active){ return; }
+		this.activeCount = 60;
+	  this.active = true;
+	}
+	inActivate(){
+		this.active = false;
+	}
 	setBall(_ball){
 		this.ball = _ball;
 	}
 	removeBall(){
 		this.ball = undefined;
+	}
+	update(){
+		if(this.activeCount > 0){
+			this.activeCount--;
+			if(this.activeCount === 0){ this.inActivate(); }
+		}
 	}
 }
 
@@ -499,7 +532,7 @@ class LinePaddle extends Paddle{
 	updateBall(){
 		if(this.ball === undefined){ return; }
 		// ボール保持中にボールのdirectionと位置をいじるやつ
-		const count = this.ball.getNonActiveFrameCount;
+		const count = this.ball.getNonActiveFrameCount();
 		const n = 2 * (abs(60 - (count % 120)) - 30);
 		const ballDirection = this.direction + n * Math.PI / 180;
 		this.ball.setDirection(ballDirection);
@@ -507,8 +540,15 @@ class LinePaddle extends Paddle{
 		                 this.y + 0.5 * this.h + (0.5 * this.h + this.ball.radius) * sin(this.direction));
 	}
 	draw(gr){
-		gr.fill(255);
+		if(this.activeCount > 30){ gr.fill(255, 242, 0); }else{ gr.fill(255); }
 		gr.rect(this.x, this.y, this.w, this.h);
+		if(this.ball !== undefined){
+		  gr.stroke(255);
+		  gr.strokeWeight(2);
+		  gr.line(this.ball.x, this.ball.y,
+				      this.ball.x + this.w * cos(this.ball.direction), this.ball.y + this.w * sin(this.ball.direction));
+			gr.noStroke();
+		}
 	}
 }
 
