@@ -370,6 +370,8 @@ class GameSystem{
 		this.mode = 0;
 		this.gutter = new Gutter(); // ガター
 		this.blocks = []; // ブロック
+		this.paddles = []; // パドル
+		this.ball = new Ball(); // ボール
 	}
 	setPattern(id){
 		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
@@ -387,6 +389,7 @@ class GameSystem{
 		this.blocks.push(new Block(13, 8, 1, 2, LIFEUP, 1));
 		this.paddles = [];
 		this.paddles.push(new LinePaddle(20, 420, 416, 416, 40, 4, -PI/2));
+		this.paddles[0].setBall(this.ball);
 	}
 	reset(mode){
 		this.score = 0;
@@ -398,25 +401,81 @@ class GameSystem{
 	update(){
 		const mx = constrain(mouseX / CANVAS_W, 0, 1);
 		const my = constrain(mouseY / CANVAS_H, 0, 1);
-		this.paddles[0].move(mx, my);
+		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); }
 	}
 	draw(){
 		this.gr.background(0);
 		this.gutter.draw(this.gr);
 		for(let b of this.blocks){ b.draw(this.gr); }
 		for(let pdl of this.paddles){ pdl.draw(this.gr); }
+		this.ball.draw(this.gr);
 	}
 }
 
+// グラフィックはとりあえず後でいいです
+// パドルでたたくと2段階までパワーアップ
+// 1段階：スピードが4から6になり攻撃力2になる
+// 2段階：スピードが6から7になり攻撃力3になる。攻撃力-耐久力が2以上の場合ブロックは反射せず貫通する（実装予定）
 class Ball{
-
+	constructor(){
+		this.x = 0;
+		this.y = 0;
+		this.speed = 4;
+		this.direction = 0;
+		this.active = false; // ひっついてるときnon-active.
+		this.radius = 8;
+		this.nonActiveFrameCount = 0;
+		this.poweredCount = 0; // 300カウントごとにレベルが下がる
+		this.level = 0;
+		this.attack = 1;
+	}
+	activate(){
+		this.active = true;
+		this.nonActiveFrameCount = 0;
+	}
+	getNonActiveFrameCount(){
+		return this.nonActiveFrameCount; // この値で
+	}
+	setPos(x, y){
+		this.x = x;
+		this.y = y;
+	}
+	setDirection(direction){
+		this.direction = direction;
+	}
+	update(){
+		if(!this.active){
+			this.nonActiveFrameCount++;
+			return;
+		} // 位置も方向もこっちでは決めない
+	}
+	draw(gr){
+		gr.fill(128);
+		gr.circle(this.x, this.y, this.radius * 2);
+	}
+	static getSpeed(level){
+		const speeds = [4, 6, 7];
+		return speeds[level];
+	}
+	static getAttack(level){
+		const speeds = [1, 2, 3];
+		return speeds[level];
+	}
 }
 
 // 0～1のマウス値から位置を出す
 class Paddle{
 	constructor(){
 	  this.ball = undefined;
+		this.active = false; // active時は色が変わる
 		this.activeCount = 0; // クリックで60になり減っていくが30より大きい間だけアクティブでその間にボール弾くとpowerupする
+		this.direction = 0; // lineとarcで若干違う感じ
+	}
+	setBall(_ball){
+		this.ball = _ball;
+	}
+	removeBall(){
+		this.ball = undefined;
 	}
 }
 
@@ -435,6 +494,17 @@ class LinePaddle extends Paddle{
 		// mx, myは0～1の値でCANVAS_WやCANVAS_Hでconstrainされたマウス値でそれを元に位置を決める
 		this.x = this.xRange[0] * (1 - mx) + this.xRange[1] * mx;
 		this.y = this.yRange[0] * (1 - my) + this.yRange[1] * my;
+		// arcの場合ここでdirectionもいじる
+	}
+	updateBall(){
+		if(this.ball === undefined){ return; }
+		// ボール保持中にボールのdirectionと位置をいじるやつ
+		const count = this.ball.getNonActiveFrameCount;
+		const n = 2 * (abs(60 - (count % 120)) - 30);
+		const ballDirection = this.direction + n * Math.PI / 180;
+		this.ball.setDirection(ballDirection);
+		this.ball.setPos(this.x + 0.5 * this.w + (0.5 * this.w + this.ball.radius) * cos(this.direction),
+		                 this.y + 0.5 * this.h + (0.5 * this.h + this.ball.radius) * sin(this.direction));
 	}
 	draw(gr){
 		gr.fill(255);
