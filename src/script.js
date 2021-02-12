@@ -17,6 +17,9 @@ const K_UP = 38;
 const K_DOWN = 40;
 const K_SPACE = 32;
 
+// ステータス
+const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
+
 // ブロックタイプ定数
 // NORMAL:白、薄い青、濃い青（幅2の厚み、文字無し）、LIFEUP:ピンク（Lの文字）、WALL:灰色（幅5の厚み）
 // 耐久は1,2,3,1,Infinityで2より大きい場合は1より大きいダメージしか受け付けない(3→1→x)
@@ -411,10 +414,30 @@ class GameSystem{
 			for(let pdl of this.paddles){ pdl.activate(); }
 		}
 	}
+	collideWithBlocks(){
+		for(let b of this.blocks){
+			if(b.collider.collideWithBall(this.ball)){
+				b.collider.reflect(this.ball);
+				break;
+			}
+		}
+	}
+	collideWithPaddles(){
+		for(let pdl of this.paddles){
+			if(pdl.collider.collideWithBall(this.ball)){
+				pdl.collider.reflect(this.ball);
+				break;
+			}
+		}
+	}
 	update(){
 		const mx = constrain(mouseX / CANVAS_W, 0, 1);
 		const my = constrain(mouseY / CANVAS_H, 0, 1);
 		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); pdl.update(); }
+		if(this.ball.isActive()){
+			this.collideWithBlocks();
+			this.collideWithPaddles();
+	  }
 		this.ball.update();
 	}
 	draw(){
@@ -434,14 +457,14 @@ class Ball{
 	constructor(){
 		this.x = 0;
 		this.y = 0;
+		this.level = 0;
+		this.attack = 1;
 		this.speed = 4;
 		this.direction = 0;
 		this.active = false; // ひっついてるときnon-active.
 		this.radius = 8;
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0; // 300カウントごとにレベルが下がる
-		this.level = 0;
-		this.attack = 1;
 	}
 	isActive(){
 		return this.active;
@@ -471,14 +494,6 @@ class Ball{
 	draw(gr){
 		gr.fill(128);
 		gr.circle(this.x, this.y, this.radius * 2);
-	}
-	static getSpeed(level){
-		const speeds = [4, 6, 7];
-		return speeds[level];
-	}
-	static getAttack(level){
-		const speeds = [1, 2, 3];
-		return speeds[level];
 	}
 }
 
@@ -522,11 +537,13 @@ class LinePaddle extends Paddle{
 		this.w = w;
 		this.h = h;
 		this.direction = direction; // ボールが存在する方向（PI/2とか-PI/2とかそういうの）
+		this.collider = new RectCollider(this.x, this.y, this.w, this.h);
 	}
 	move(mx, my){
 		// mx, myは0～1の値でCANVAS_WやCANVAS_Hでconstrainされたマウス値でそれを元に位置を決める
 		this.x = this.xRange[0] * (1 - mx) + this.xRange[1] * mx;
 		this.y = this.yRange[0] * (1 - my) + this.yRange[1] * my;
+		this.collider.update(this.x, this.y);
 		// arcの場合ここでdirectionもいじる
 	}
 	updateBall(){
@@ -565,6 +582,7 @@ class Block{
 		this.h = gridH * GRIDSIZE;
 		this.blockType = blockType;
 		this.tough = tough;
+		this.collider = new RectCollider(this.x, this.y, this.w, this.h);
 	}
 	orthodoxDraw(gr, ratio, col1, col2, col3, round = 0){
 		// 1UPは丸っこくする
@@ -623,6 +641,7 @@ class Gutter{
 	}
 }
 
+// collideの処理は現在の位置に速度を足したものについて行なう。そこだけ注意。
 class Collider{
 	constructor(){
 		this.type = "";
@@ -647,10 +666,30 @@ class RectCollider extends Collider{
 		this.y = y;
 	}
 	collideWithBall(_ball){
-
+		// 速度を足す。
+		const d = _ball.direction;
+		const postX = _ball.x + _ball.speed * cos(d);
+		const postY = _ball.y + _ball.speed * sin(d);
+		// ぶつかるかどうか調べてtrueかfalseを返すだけ。
+		if(this.x + this.w < postX - _ball.radius || postX + _ball.radius < this.x){ return false; }
+		if(this.y + this.h < postY - _ball.radius || postY + _ball.radius < this.y){ return false; }
+		return true;
 	}
 	reflect(_ball){
-
+		// ぶつかる場合に速度を変える
+		const d = _ball.direction;
+		const postX = _ball.x + _ball.speed * cos(d);
+		const postY = _ball.y + _ball.speed * sin(d);
+		const cx = this.x + this.w * 0.5;
+		const cy = this.y + this.h * 0.5;
+		if(abs(postX - cx) < this.w * 0.5){ _ball.setDirection(-d); return; }
+		if(abs(postY - cy) < this.h * 0.5){ _ball.setDirection(Math.PI - d); return; }
+		let mainDirection;
+		if(postX > cx && postY > cy){ mainDirection = Math.PI / 4; }
+		if(postX < cx && postY > cy){ mainDirection = Math.PI * 3 / 4; }
+		if(postX < cx && postY < cy){ mainDirection = Math.PI * 5 / 4; }
+		if(postX > cx && postY < cy){ mainDirection = Math.PI * 7 / 4; }
+		_ball.setDirection(mainDirection + (Math.random() * 2 - 1) * Math.PI / 12);
 	}
 }
 
