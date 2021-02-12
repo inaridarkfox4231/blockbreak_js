@@ -311,7 +311,9 @@ class Play extends State{
 			return;
 		}
 		this.gameSystem.update();
-		this.gameSystem.gameoverCheck(); // ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
+		if(this.gameSystem.gameoverCheck()){
+			this.setNextState("gameover");
+		} // ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
 	}
 	showPreAnimation(){
 		this.gr.background(0);
@@ -345,6 +347,9 @@ class Pause extends State{
 	draw(){}
 }
 
+// ゲームオーバーについてはPlayの画像を借りつつちょっと薄暗くして中央に文字描いて終わり的な。
+// テトリスのようなアニメは無くって文字だけ。エンターキーで戻る。
+// Playからしか来ない。
 class Gameover extends State{
 	constructor(_node){
 		super(_node);
@@ -352,11 +357,26 @@ class Gameover extends State{
 	}
 	drawPrepare(){} // 準備描画（最初に一回だけやる）
   prepare(_state){
+		this.gr.image(_state.gr, 0, 0);
+		this.gr.background(0, 128);
+		this.gr.fill(255);
+		this.gr.textFont(huiFont);
+		this.gr.textSize(48);
+		this.gr.textAlign(CENTER, CENTER);
+		this.gr.translate(CANVAS_W * 0.5, CANVAS_H * 0.5);
+		this.gr.text("GAME OVER...", 0, -24);
+		this.gr.text("PRESS ENTER KEY", 0, 24);
   }
-  keyAction(code){} // キーイベント
+  keyAction(code){
+		if(code === K_ENTER){
+			this.setNextState("title");
+		}
+	} // キーイベント
 	clickAction(){} // マウスクリックイベント
 	update(){}
-	draw(){}
+	draw(){
+		image(this.gr, 0, 0);
+	}
 }
 
 class Clear extends State{
@@ -382,11 +402,13 @@ class GameSystem{
 		this.blocks = []; // ブロック
 		this.paddles = []; // パドル
 		this.ball = new Ball(); // ボール
+		this.currentPaddleId = -1; // ボールが属するパドルのid. シフトキーで移動させるのに使う可能性がある
 	}
 	setPattern(id){
 		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
 		this.gr = createGraphics(480, 460);
 		this.gr.noStroke();
+		this.ball.initialize(); // ボールの初期化
 		const colliders = [new RectCollider(20, 440, 440, 20)];
 		this.gutter.setting(480, 460, colliders);
 		this.blocks = [];
@@ -400,6 +422,7 @@ class GameSystem{
 		this.paddles = [];
 		this.paddles.push(new LinePaddle(20, 420, 416, 416, 40, 4, -PI/2));
 		this.paddles[0].setBall(this.ball);
+		this.currentPaddleId = 0;
 	}
 	initialize(mode){
 		// レベルの最初に行なう処理。スコアのリセットとライフ設定
@@ -412,9 +435,10 @@ class GameSystem{
 	}
 	clickAction(){
 		// ボールがnonActive: activateしておわり。active:すべてのパドルをactivateする
-		if(!this.ball.isActive()){
-			for(let pdl of this.paddles){ pdl.removeBall(); }
+		if(this.currentPaddleId >= 0){
+			this.paddles[this.currentPaddleId].removeBall();
 			this.ball.activate();
+			this.currentPaddleId = -1;
 		}else{
 			for(let pdl of this.paddles){ pdl.activate(); }
 		}
@@ -452,9 +476,11 @@ class GameSystem{
 		}
 	}
 	gameoverCheck(){
+		if(this.ball.isAlive()){ return false; }
 		if(!this.ball.isAlive() && this.ball.getLife() > 0){
-			this.ball.initialize();
+      this.ball.initialize();
 			this.paddles[0].setBall(this.ball);
+			this.currentPaddleId = 0;
 			return false;
 		}
 		return true;
@@ -526,6 +552,9 @@ class Ball{
 		this.active = false;
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0;
+		// ゴーストを消すため一瞬だけ画面外に消えてもらう。よくある処理。一瞬なので問題ない。
+		this.x = -100;
+		this.y = -100;
 	}
 	getNonActiveFrameCount(){
 		return this.nonActiveFrameCount; // この値で方向をいじる
@@ -760,6 +789,14 @@ class RingCollider extends Collider{
 	constructor(){
 		super();
 		this.type = "ring";
+	}
+}
+
+// 円タイプのブロックも今後使っていきたい。円は緑系統の色で。
+class CircleCollider extends Collider{
+	constructor(){
+		super();
+		this.type = "circle";
 	}
 }
 
