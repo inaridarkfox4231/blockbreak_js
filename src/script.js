@@ -361,11 +361,10 @@ class Gameover extends State{
 		this.gr.background(0, 128);
 		this.gr.fill(255);
 		this.gr.textFont(huiFont);
-		this.gr.textSize(48);
+		this.gr.textSize(CANVAS_H * 0.08);
 		this.gr.textAlign(CENTER, CENTER);
-		this.gr.translate(CANVAS_W * 0.5, CANVAS_H * 0.5);
-		this.gr.text("GAME OVER...", 0, -24);
-		this.gr.text("PRESS ENTER KEY", 0, 24);
+		this.gr.text("GAME OVER...", CANVAS_W * 0.5, CANVAS_H * 0.46);
+		this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
   }
   keyAction(code){
 		if(code === K_ENTER){
