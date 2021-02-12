@@ -385,13 +385,13 @@ class GameSystem{
 	}
 	setPattern(id){
 		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
-		this.gr = createGraphics(480, 440);
+		this.gr = createGraphics(480, 460);
 		this.gr.noStroke();
-		const colliders = [new RectCollider(20, 420, 440, 20)];
-		this.gutter.setting(480, 440, colliders);
+		const colliders = [new RectCollider(20, 440, 440, 20)];
+		this.gutter.setting(480, 460, colliders);
 		this.blocks = [];
-		this.blocks.push(new Block(0, 3, 1, 19));
-		this.blocks.push(new Block(23, 3, 1, 19));
+		this.blocks.push(new Block(0, 3, 1, 20));
+		this.blocks.push(new Block(23, 3, 1, 20));
 		this.blocks.push(new Block(1, 3, 22, 1));
 		this.blocks.push(new Block(8, 8, 2, 1, NORMAL, 1));
 		this.blocks.push(new Block(8, 6, 2, 1, NORMAL, 2));
