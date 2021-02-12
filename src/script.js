@@ -17,6 +17,8 @@ const K_UP = 38;
 const K_DOWN = 40;
 const K_SPACE = 32;
 
+// ライフ
+const LIFES = [3, 5, 10, 15];
 // ステータス
 const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
 
@@ -286,8 +288,8 @@ class Play extends State{
 	}
   prepare(_state){
 		switch(_state.name){
-			case "selectmode":
-			  this.gameSystem.reset(_state.choice - 1); // 1を引くって感じで。mode（難易度）設定。
+			case "selectMode":
+			  this.gameSystem.initialize(_state.choice - 1); // 1を引くって感じで。mode（難易度）設定。
 				this.level = _state.level; // レベル番号要るかな・・んー
 				this.stage = 0; // ステージ番号リセット
 				break;
@@ -309,6 +311,7 @@ class Play extends State{
 			return;
 		}
 		this.gameSystem.update();
+		this.gameSystem.gameoverCheck(); // ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
 	}
 	showPreAnimation(){
 		this.gr.background(0);
@@ -398,9 +401,11 @@ class GameSystem{
 		this.paddles.push(new LinePaddle(20, 420, 416, 416, 40, 4, -PI/2));
 		this.paddles[0].setBall(this.ball);
 	}
-	reset(mode){
+	initialize(mode){
+		// レベルの最初に行なう処理。スコアのリセットとライフ設定
 		this.score = 0;
 		this.mode = mode;
+		this.ball.setLife(LIFES[mode]);
 	}
 	getOffSet(){
 		return {x:(CANVAS_W - this.gr.width) * 0.5, y:(CANVAS_H - this.gr.height) * 0.5};
@@ -431,6 +436,7 @@ class GameSystem{
 		}
 	}
 	update(){
+		if(!this.ball.isAlive()){ return; }
 		const mx = constrain(mouseX / CANVAS_W, 0, 1);
 		const my = constrain(mouseY / CANVAS_H, 0, 1);
 		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); pdl.update(); }
@@ -439,13 +445,32 @@ class GameSystem{
 			this.collideWithPaddles();
 	  }
 		this.ball.update();
+		if(this.ball.isActive()){
+			if(this.gutter.check(this.ball)){
+				this.ball.kill();
+			}
+		}
+	}
+	gameoverCheck(){
+		if(!this.ball.isAlive() && this.ball.getLife() > 0){
+			this.ball.initialize();
+			this.paddles[0].setBall(this.ball);
+			return false;
+		}
+		return true;
 	}
 	draw(){
 		this.gr.background(0);
 		this.gutter.draw(this.gr);
 		for(let b of this.blocks){ b.draw(this.gr); }
 		for(let pdl of this.paddles){ pdl.draw(this.gr); }
-		this.ball.draw(this.gr);
+		if(this.ball.isAlive()){ this.ball.draw(this.gr); }
+		this.gr.fill(255);
+		for(let k = 0; k < this.ball.getLife(); k++){
+			let cx = 120 + 30 * k + 15;
+			let cy = 0 + 15;
+			this.gr.circle(cx, cy, 25);
+		}
 	}
 }
 
@@ -457,6 +482,8 @@ class Ball{
 	constructor(){
 		this.x = 0;
 		this.y = 0;
+		this.life = 0;
+		this.alive = true;
 		this.level = 0;
 		this.attack = 1;
 		this.speed = 4;
@@ -466,15 +493,42 @@ class Ball{
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0; // 300カウントごとにレベルが下がる
 	}
+	getLife(){
+		return this.life;
+	}
+	setLife(life){
+		this.life = life;
+	}
 	isActive(){
 		return this.active;
+	}
+	isAlive(){
+		return this.alive;
 	}
 	activate(){
 		this.active = true;
 		this.nonActiveFrameCount = 0;
 	}
+	inActivate(){
+		this.active = false;
+	}
+	kill(){
+		this.life--;
+		this.alive = false;
+	}
+	initialize(){
+		// 落ちてから復活するたびにこれをやる
+		// 最終的にはガターにぶつかってパーティクルが出てそれが済んでからこれをやる。
+		this.alive = true;
+		this.level = 0;
+		this.attack = 1;
+		this.speed = 4;
+		this.active = false;
+		this.nonActiveFrameCount = 0;
+		this.poweredCount = 0;
+	}
 	getNonActiveFrameCount(){
-		return this.nonActiveFrameCount; // この値で
+		return this.nonActiveFrameCount; // この値で方向をいじる
 	}
 	setPos(x, y){
 		this.x = x;
