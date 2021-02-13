@@ -269,6 +269,7 @@ class SelectMode extends State{
 // クリアに情報持たせるのは無駄、同じ理由でポーズやゲームオーバーにその情報を持たせることもしない・・あ、
 // クリアにステージ番号だけは持たせる。5だったらオールクリア。
 // offsetね
+// ああ、pauseから来る場合は何もしないのよ・・忘れてた。
 class Play extends State{
 	constructor(_node){
 		super(_node);
@@ -288,6 +289,8 @@ class Play extends State{
 	}
   prepare(_state){
 		switch(_state.name){
+			case "pause":
+			  return;
 			case "selectMode":
 			  this.gameSystem.initialize(_state.choice - 1); // 1を引くって感じで。mode（難易度）設定。
 				this.level = _state.level; // レベル番号要るかな・・んー
@@ -301,6 +304,10 @@ class Play extends State{
   }
   keyAction(code){
 		// シフトキーでボールの位置が変わるかも
+		// スペースキーでポーズ
+		if(code === K_SPACE){
+			this.setNextState("pause");
+		}
 	}
 	clickAction(){
 		this.gameSystem.clickAction();
@@ -339,18 +346,34 @@ class Play extends State{
 	}
 }
 
+// Playからスペースキーで来てスペースキーで去っていく。
+// Playからしか来ないので場合分けは要らない
 class Pause extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "pause";
+		this.gr.fill(255);
+		this.gr.textFont(huiFont);
+		this.gr.textSize(CANVAS_H * 0.08);
+		this.gr.textAlign(CENTER, CENTER);
 	}
 	drawPrepare(){} // 準備描画（最初に一回だけやる）
   prepare(_state){
+		this.gr.image(_state.gr, 0, 0);
+		this.gr.background(0, 128);
+		this.gr.text("---PAUSE---", CANVAS_W * 0.5, CANVAS_H * 0.46);
+		this.gr.text("PRESS SPACE KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
   }
-  keyAction(code){} // キーイベント
+  keyAction(code){
+		if(code === K_SPACE){
+			this.setNextState("play");
+		}
+	}
 	clickAction(){} // マウスクリックイベント
 	update(){}
-	draw(){}
+	draw(){
+		image(this.gr, 0, 0);
+	}
 }
 
 // ゲームオーバーについてはPlayの画像を借りつつちょっと薄暗くして中央に文字描いて終わり的な。
