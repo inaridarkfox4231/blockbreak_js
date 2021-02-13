@@ -445,14 +445,22 @@ class GameSystem{
 	collideWithBlocks(){
 		for(let b of this.blocks){
 			if(b.collider.collideWithBall(this.ball)){
+				b.hitWithBall(this.ball);
+				this.ball.hitWithBlock(b);
 				b.collider.reflect(this.ball);
 				break;
 			}
 		}
+		let id = -1;
+		for(let i = 0; i < this.blocks.length; i++){
+			if(!this.blocks[i].isAlive()){ id = i; break; }
+		}
+		if(id >= 0){ this.blocks.splice(id, 1); }
 	}
 	collideWithPaddles(){
 		for(let pdl of this.paddles){
 			if(pdl.collider.collideWithBall(this.ball)){
+				this.ball.hitWithPaddle(pdl);
 				pdl.collider.reflect(this.ball);
 				break;
 			}
@@ -541,6 +549,21 @@ class Ball{
 		this.life--;
 		this.alive = false;
 	}
+	setStatus(){
+		this.speed = STATUS.speed[this.level];
+		this.attack = STATUS.attack[this.level];
+	}
+	hitWithBlock(_block){
+
+	}
+	hitWithPaddle(_paddle){
+		// パドルがアクティブのときレベルアップ（ただし上限のときは反応無し）
+		if(!_paddle.isActive()){ return; }
+		if(this.level === 1){ return; }
+		this.level++;
+		this.poweredCount = 300;
+		this.setStatus();
+	}
 	initialize(){
 		// 落ちてから復活するたびにこれをやる
 		// 最終的にはガターにぶつかってパーティクルが出てそれが済んでからこれをやる。
@@ -570,11 +593,21 @@ class Ball{
 			this.nonActiveFrameCount++;
 			return;
 		} // 位置も方向もこっちでは決めない
+		if(this.poweredCount > 0){
+			this.poweredCount--;
+			if(this.poweredCount === 0){
+				this.level--;
+				this.setStatus();
+			}
+		}
 		this.x += this.speed * cos(this.direction);
 		this.y += this.speed * sin(this.direction);
 	}
 	draw(gr){
-		gr.fill(128);
+		switch(this.level){
+			case 0: gr.fill(128); break;
+			case 1: gr.fill(255, 128, 0); break;
+		}
 		gr.circle(this.x, this.y, this.radius * 2);
 	}
 }
@@ -584,8 +617,11 @@ class Paddle{
 	constructor(){
 	  this.ball = undefined;
 		this.active = false; // active時は色が変わる
-		this.activeCount = 0; // クリックで60になり減っていくが30より大きい間だけアクティブでその間にボール弾くとpowerupする
+		this.activeCount = 0; // クリックで60になり減っていく. アクティブの間にボール弾くとpowerupする
 		this.direction = 0; // lineとarcで若干違う感じ
+	}
+	isActive(){
+		return this.active;
 	}
 	activate(){
 		if(this.active){ return; }
@@ -639,8 +675,12 @@ class LinePaddle extends Paddle{
 		                 this.y + 0.5 * this.h + (0.5 * this.h + this.ball.radius) * sin(this.direction));
 	}
 	draw(gr){
-		if(this.activeCount > 30){ gr.fill(255, 242, 0); }else{ gr.fill(255); }
+		if(this.active){ gr.fill(255, 242, 0); }else{ gr.fill(255); }
 		gr.rect(this.x, this.y, this.w, this.h);
+		// そのうちもっと分かりやすくする
+		if(this.active){
+			gr.text("active", this.x, this.y - 20);
+		}
 		if(this.ball !== undefined){
 		  gr.stroke(255);
 		  gr.strokeWeight(2);
@@ -664,6 +704,7 @@ class Block{
 		this.h = gridH * GRIDSIZE;
 		this.blockType = blockType;
 		this.tough = tough;
+		this.alive = true;
 		this.collider = new RectCollider(this.x, this.y, this.w, this.h);
 	}
 	orthodoxDraw(gr, ratio, col1, col2, col3, round = 0){
@@ -675,6 +716,17 @@ class Block{
 		gr.rect(this.x + diff, this.y + diff, this.w - diff, this.h - diff, round);
 		gr.fill(...col3);
 		gr.rect(this.x + diff, this.y + diff, this.w - diff * 2, this.h - diff * 2, round);
+	}
+	isAlive(){
+		return this.alive;
+	}
+	kill(){
+		this.alive = false;
+	}
+	hitWithBall(_ball){
+		if(this.tough - _ball.attack > 1){ return; }
+		this.tough -= _ball.attack;
+		if(this.tough <= 0){ this.kill(); }
 	}
 	draw(gr){
 		switch(this.blockType){
