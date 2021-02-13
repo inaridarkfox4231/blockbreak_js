@@ -310,10 +310,16 @@ class Play extends State{
 			this.preAnimationSpan--;
 			return;
 		}
+		// ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
 		this.gameSystem.update();
 		if(this.gameSystem.gameoverCheck()){
 			this.setNextState("gameover");
-		} // ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
+		}
+		// クリアにする。true返したら、ステージ番号増やす。5になったらplayに戻さずにタイトルへ。
+		if(this.gameSystem.clearCheck()){
+			this.stage++;
+			this.setNextState("clear");
+		}
 	}
 	showPreAnimation(){
 		this.gr.background(0);
@@ -354,15 +360,15 @@ class Gameover extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "gameover";
+		this.gr.fill(255);
+		this.gr.textFont(huiFont);
+		this.gr.textSize(CANVAS_H * 0.08);
+		this.gr.textAlign(CENTER, CENTER);
 	}
 	drawPrepare(){} // 準備描画（最初に一回だけやる）
   prepare(_state){
 		this.gr.image(_state.gr, 0, 0);
 		this.gr.background(0, 128);
-		this.gr.fill(255);
-		this.gr.textFont(huiFont);
-		this.gr.textSize(CANVAS_H * 0.08);
-		this.gr.textAlign(CENTER, CENTER);
 		this.gr.text("GAME OVER...", CANVAS_W * 0.5, CANVAS_H * 0.46);
 		this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
   }
@@ -378,17 +384,44 @@ class Gameover extends State{
 	}
 }
 
+// Playから来る。stageを読み取り、5より小さいならPlayに戻して次のステージを用意する。
 class Clear extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "clear";
+		this.allClearFlag = false;
+		this.gr.fill(255);
+		this.gr.textFont(huiFont);
+		this.gr.textSize(CANVAS_H * 0.08);
+		this.gr.textAlign(CENTER, CENTER);
 	}
 	drawPrepare(){} // 準備描画（最初に一回だけやる）
-  prepare(_state){}
-  keyAction(code){} // キーイベント
+  prepare(_state){
+		this.allClearFlag = (_state.stage < 5 ? false : true);
+		this.gr.image(_state.gr, 0, 0);
+		this.gr.background(0, 128);
+		if(this.allClearFlag){
+			this.gr.text("STAGE ALL CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
+			this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
+		}else{
+			this.gr.text("STAGE CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
+			this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
+		}
+	}
+  keyAction(code){
+		if(code === K_ENTER){
+			if(this.allClearFlag){
+				this.setNextState("title");
+			}else{
+				this.setNextState("play");
+			}
+		}
+	} // キーイベント
 	clickAction(){} // マウスクリックイベント
 	update(){}
-	draw(){}
+	draw(){
+		image(this.gr, 0, 0);
+	}
 }
 
 // play内部でこれを呼び出す感じ
@@ -439,7 +472,7 @@ class GameSystem{
 			this.ball.activate();
 			this.currentPaddleId = -1;
 		}else{
-			for(let pdl of this.paddles){ pdl.activate(); }
+			for(let pdl of this.paddles){ pdl.activeSwitch(); }
 		}
 	}
 	collideWithBlocks(){
@@ -468,8 +501,9 @@ class GameSystem{
 	}
 	update(){
 		if(!this.ball.isAlive()){ return; }
-		const mx = constrain(mouseX / CANVAS_W, 0, 1);
-		const my = constrain(mouseY / CANVAS_H, 0, 1);
+		const offSet = this.getOffSet();
+		const mx = constrain((mouseX - offSet.x) / this.gr.width, 0, 1);
+		const my = constrain((mouseY - offSet.y) / this.gr.height, 0, 1);
 		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); pdl.update(); }
 		if(this.ball.isActive()){
 			this.collideWithBlocks();
@@ -489,6 +523,12 @@ class GameSystem{
 			this.paddles[0].setBall(this.ball);
 			this.currentPaddleId = 0;
 			return false;
+		}
+		return true;
+	}
+	clearCheck(){
+		for(let b of this.blocks){
+			if(b.blockType === NORMAL){ return false; }
 		}
 		return true;
 	}
@@ -524,7 +564,7 @@ class Ball{
 		this.active = false; // ひっついてるときnon-active.
 		this.radius = 8;
 		this.nonActiveFrameCount = 0;
-		this.poweredCount = 0; // 300カウントごとにレベルが下がる
+		this.poweredCount = 0; // 240カウントごとにレベルが下がる
 	}
 	getLife(){
 		return this.life;
@@ -554,14 +594,19 @@ class Ball{
 		this.attack = STATUS.attack[this.level];
 	}
 	hitWithBlock(_block){
-
+		// LIFEUPでライフ回復。まあそのくらい。
+		switch(_block.blockType){
+			case LIFEUP:
+			  this.life++;
+				break;
+		}
 	}
 	hitWithPaddle(_paddle){
 		// パドルがアクティブのときレベルアップ（ただし上限のときは反応無し）
 		if(!_paddle.isActive()){ return; }
 		if(this.level === 1){ return; }
 		this.level++;
-		this.poweredCount = 300;
+		this.poweredCount = 240;
 		this.setStatus();
 	}
 	initialize(){
@@ -616,20 +661,14 @@ class Ball{
 class Paddle{
 	constructor(){
 	  this.ball = undefined;
-		this.active = false; // active時は色が変わる
-		this.activeCount = 0; // クリックで60になり減っていく. アクティブの間にボール弾くとpowerupする
+		this.active = false; // active時は色が変わる. activeはクリックで切り替える。
 		this.direction = 0; // lineとarcで若干違う感じ
 	}
 	isActive(){
 		return this.active;
 	}
-	activate(){
-		if(this.active){ return; }
-		this.activeCount = 60;
-	  this.active = true;
-	}
-	inActivate(){
-		this.active = false;
+	activeSwitch(){
+		this.active = !this.active;
 	}
 	setBall(_ball){
 		this.ball = _ball;
@@ -637,12 +676,7 @@ class Paddle{
 	removeBall(){
 		this.ball = undefined;
 	}
-	update(){
-		if(this.activeCount > 0){
-			this.activeCount--;
-			if(this.activeCount === 0){ this.inActivate(); }
-		}
-	}
+	update(){}
 }
 
 class LinePaddle extends Paddle{
@@ -677,10 +711,6 @@ class LinePaddle extends Paddle{
 	draw(gr){
 		if(this.active){ gr.fill(255, 242, 0); }else{ gr.fill(255); }
 		gr.rect(this.x, this.y, this.w, this.h);
-		// そのうちもっと分かりやすくする
-		if(this.active){
-			gr.text("active", this.x, this.y - 20);
-		}
 		if(this.ball !== undefined){
 		  gr.stroke(255);
 		  gr.strokeWeight(2);
