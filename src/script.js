@@ -2,9 +2,13 @@
 // ステージを構成するjsonは別ルートで構成する流れ・・うまくいくか知らんけど
 
 // State一覧
-// Title, SelectLevel, SelectMode, Play, Pause, Gameover, Clear(AllClear)で全部
+// Title, Play, Pause, Gameover, Clearで全部
 
 let mySystem;
+
+// ----------------------------------------------------------------------------------- //
+// constant.
+
 const CANVAS_W = 800;
 const CANVAS_H = 600;
 const GRIDSIZE = 20;
@@ -25,6 +29,9 @@ const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
 const PADDLE_LENGTH = [80, 60, 40, 30];
 // ブロックヒュー
 const BLOCK_HUE = [18, 10, 0, 78, 65];
+// モードテキスト
+const MODE_TEXT = ["EASY", "NORMAL", "HARD", "CRAZY"];
+const MODE_HUE = [40, 55, 70, 85]
 
 // ブロックタイプ定数
 // NORMAL:白、薄い青、濃い青（幅2の厚み、文字無し）、LIFEUP:ピンク（Lの文字）、WALL:灰色（幅5の厚み）
@@ -37,6 +44,9 @@ const LIFEUP = 1;
 const WALL = 2;
 
 let huiFont;
+
+// ----------------------------------------------------------------------------------- //
+// main.
 
 function preload(){
 	huiFont = loadFont("https://inaridarkfox4231.github.io/assets/HuiFont29.ttf");
@@ -53,10 +63,13 @@ function draw() {
 	mySystem.shift();
 }
 
+// ----------------------------------------------------------------------------------- //
+// system.
+
 // 遷移図作り直し（てかp5jsで描こうよ）
 class System{
 	constructor(){
-		this.state = {title:new Title(this), selectLevel:new SelectLevel(this), selectMode:new SelectMode(this), play:new Play(this),
+		this.state = {title:new Title(this), play:new Play(this),
 		              pause:new Pause(this), gameover:new Gameover(this), clear:new Clear(this)};
 		this.currentState = this.state.title;
 	}
@@ -83,6 +96,9 @@ class System{
 	}
 }
 
+// ----------------------------------------------------------------------------------- //
+// state.
+
 class State{
 	constructor(_node){
     this.node = _node;
@@ -105,165 +121,135 @@ class State{
 	draw(){}
 }
 
+// 要するにタイトルからプレイ行くの？
+// ゲームに依るんじゃない・・まあいいけど。めんどくさいしな。クリックで行けた方が楽よね。
+// 水色、青、紫で。
 class Title extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "title";
+		this.level = 0;
+		this.mode = 0;
+		this.levelSpace = createGraphics(80 + 440, 40);
+		this.modeSpace = createGraphics(70 + 350, 40);
+		this.playButton = createGraphics(120, 60);
 		this.drawPrepare();
 	}
+	drawNonActiveButton(gr, x, y, txt){
+		gr.fill(50);
+		gr.triangle(x, y, x + 80, y, x, y + 40);
+		gr.fill(25);
+		gr.triangle(x + 80, y, x, y + 40, x + 80, y + 40);
+		gr.fill(75);
+		gr.rect(x + 8, y + 4, 64, 32);
+		gr.fill(0);
+		gr.text(txt, x + 40, y + 20);
+	}
+	drawActiveButton(gr, x, y, txt, hue){
+		gr.fill(hue, 50, 100);
+		gr.triangle(x, y, x + 80, y, x, y + 40);
+		gr.fill(hue, 100, 50);
+		gr.triangle(x + 80, y, x, y + 40, x + 80, y + 40);
+		gr.fill(hue, 100, 100);
+		gr.rect(x + 8, y + 4, 64, 32);
+		gr.fill(0);
+		gr.text(txt, x + 40, y + 20);
+	}
   drawPrepare(){
-		this.gr.background(80, 128, 255);
 		this.gr.textFont(huiFont);
 		this.gr.textAlign(CENTER, CENTER);
 		this.gr.fill(0);
-		this.gr.textSize(80);
-		this.gr.text("BLOCKBREAK", CANVAS_W * 0.5, CANVAS_H * 0.33);
-		this.gr.textSize(40);
-		this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.6);
+    ordinaryPrepare([this.levelSpace, this.modeSpace, this.playButton]);
+		this.drawLevelButtons();
+		this.drawModeButtons();
+		this.drawPlayButton();
+	}
+	drawLevelButtons(){
+		this.levelSpace.clear();
+		for(let i = 0; i < 5; i++){
+			if(i === this.level){
+				this.drawActiveButton(this.levelSpace, 80 + 90 * i, 0, "Lv." + i, 20);
+			}else{
+				this.drawNonActiveButton(this.levelSpace, 80 + 90 * i, 0, "Lv." + i);
+			}
+		}
+		this.levelSpace.fill(0);
+		this.levelSpace.text("LEVEL:", 40, 20);
+	}
+	drawModeButtons(){
+		this.modeSpace.clear();
+		for(let i = 0; i < 4; i++){
+			if(i === this.mode){
+				this.drawActiveButton(this.modeSpace, 70 + 90 * i, 0, MODE_TEXT[i], MODE_HUE[i]);
+			}else{
+				this.drawNonActiveButton(this.modeSpace, 70 + 90 * i, 0, MODE_TEXT[i]);
+			}
+		}
+		this.modeSpace.fill(0);
+		this.modeSpace.text("MODE:", 35, 20);
+	}
+	drawPlayButton(){
+		this.playButton.textSize(48);
+		this.playButton.fill(0, 50, 100);
+		this.playButton.triangle(0, 0, 120, 0, 0, 60);
+		this.playButton.fill(0, 100, 50);
+		this.playButton.triangle(120, 0, 0, 60, 120, 60);
+		this.playButton.fill(0, 100, 100);
+		this.playButton.rect(12, 6, 96, 48);
+		this.playButton.fill(0);
+		this.playButton.text("play", 60, 24);
 	}
 	prepare(_state){}
   keyAction(code){
-    // エンターキー押したらセレクトへ
+    // エンターキー押したら直接プレイへ飛ぶ
     if(code === K_ENTER){
-      this.setNextState("selectLevel");
+      this.setNextState("play");
     }
+	}
+	clickAction(){
+		// クリック位置によってレベル変更、モード変更、プレイ、の3種類の可能性。
+		// レベルボタンの位置：(220, 310, 400, 490, 580)x(300, 300, 300, 300, 300)の80x40です。
+		// モードボタンの位置：(260, 350, 440, 530)x(400, 400, 400, 400)の80x40.
+		// プレイボタンの位置：340x505の120x60です。
+		const mx = mouseX;
+		const my = mouseY;
+		if(mx > 220 && mx < 660 && my > 300 && my < 340){
+			if((mx - 220) % 90 > 80){ return; }
+			this.level = Math.floor((mx - 220) / 90);
+			this.drawLevelButtons();
+		}
+		if(mx > 260 && mx < 610 && my > 400 && my < 440){
+			if((mx - 260) % 90 > 80){ return; }
+			this.mode = Math.floor((mx - 260) / 90);
+			this.drawModeButtons();
+		}
+		if(mx > 340 && mx < 460 && my > 505 && my < 565){
+			this.setNextState("play");
+		}
 	}
 	update(){}
 	draw(){
+		this.gr.background(200, 200, 255);
+		this.gr.textSize(80);
+		this.gr.text("BLOCKBREAK", 400, 80);
+		this.gr.textSize(40);
+		this.gr.text("PRESS ENTER KEY", 400, 170);
+		this.gr.text("(OR CLICK PLAY BUTTON)", 400, 220);
+		this.gr.image(this.levelSpace, 400 - 40 - 220, 320 - 20);
+		this.gr.image(this.modeSpace, 400 - 35 - 175, 420 - 20);
+		this.gr.image(this.playButton, 400 - 60, 520 - 15);
 		image(this.gr, 0, 0);
 	}
 }
 
-class SelectLevel extends State{
-	constructor(_node){
-		super(_node);
-		this.name = "selectLevel";
-		this.choice = 0;
-		this.choiceLength = 6; // 0:TO TITLE, 1～5:各レベル（実際は0～4）
-		this.txt = ["TO TITLE", "LEVEL 0", "LEVEL 1", "LEVEL 2", "LEVEL 3", "LEVEL 4"];
-		this.base = createGraphics(CANVAS_W, CANVAS_H);
-		this.drawPrepare();
-	}
-  drawPrepare(){
-		this.base.background(40, 128, 255);
-		this.gr.textSize(30);
-		this.gr.noStroke();
-		this.gr.textFont(huiFont);
-	}
-	prepare(_state){
-		// choice変数を0に戻さないと
-		this.choice = 0;
-	}
-  keyAction(code){
-    // 上下キーで選択、エンターキーでtitleまたはmodeに移行
-    switch(code){
-      case K_UP:
-        this.choice = (this.choice + this.choiceLength - 1) % this.choiceLength;
-        break;
-      case K_DOWN:
-        this.choice = (this.choice + 1) % this.choiceLength;
-        break;
-      case K_ENTER:
-        if(this.choice === 0){
-          this.setNextState("title");
-        }else{
-          this.setNextState("selectMode");
-        }
-        break;
-    }
-	}
-	update(){
-		// そうね・・やること、ないわね・・
-	}
-	draw(){
-    this.gr.image(this.base, 0, 0);
-		let col = [0, 0, 0, 0, 0, 0];
-		col[this.choice] += 255;
-		const left = 135;
-		if(col[0] > 0){ this.gr.fill(0); this.gr.rect(left, 40, 130, 30); }
-		this.gr.fill(col[0]);
-		this.gr.text(this.txt[0], left + 2, 63);
-		for(let k = 1; k < 6; k++){
-			if(col[k] > 0){ this.gr.fill(0); this.gr.rect(left, 70 + 50 * k, 183, 30); }
-			this.gr.fill(col[k]);
-			this.gr.text(this.txt[k], left + 2, 93 + 50 * k);
-		}
-    image(this.gr, 0, 0);
-	}
-}
-
-// このページで操作説明する
-// 難易度はEASY, NORMAL, HARD, CRAZYの4種類でいこうか（同じ仕様でやる）
-// 難易度ごとに色変える感じで（青→緑→黄色→赤）
-class SelectMode extends State{
-	constructor(_node){
-		super(_node);
-		this.name = "selectMode";
-		this.base = createGraphics(CANVAS_W, CANVAS_H);
-		this.level = 0; // selectからレベルの情報を受け取る。playに渡す。
-		this.levelText = ""; // STAGE--～--のテキストをコピーする感じ
-		this.choice = 0; // playのdifficultyとなる値。modeという名前になってるのは、要するに選択画面では常に"mode"という名前を使うってだけの話。
-		// playの方でlevelとdifficulty,更にステージ番号1～5に応じてステージが生成されてゲームが行われる
-		// ライフ0になったらタイトルに強制的に戻されクリアの場合は次のステージに進み全部クリアしたらやはりタイトルに戻る（スコア表示後）
-		// セーブ機能は無いけどまあスコアがセレクト画面に記録されるくらいはいいかなって思うけども（クッキー使う？）
-		this.choiceLength = 5; // 0:TO SELECT, 1～4:難易度。
-		this.txt = ["TO SELECT", "EASY", "NORMAL", "HARD", "CRAZY"];
-		this.drawPrepare();
-	}
-  drawPrepare(){
-		this.base.background(128);
-		/* ここでインストラクション書いた方がいいかもなぁ */
-		this.gr.textSize(30);
-		this.gr.noStroke();
-		this.gr.textFont(huiFont);
-	}
-	prepare(_state){
-		// モード変数を0に戻す。
-		this.choice = 0;
-		// ModeにはSelectからしか来ることができないのでlevelをここでSelectの情報を元に設定
-		this.level = _state.choice - 1; // 0～4
-		this.levelText = _state.txt[_state.choice]; // それに応じたテキスト
-	}
-  keyAction(code){
-    // 上下キーで選択、エンターキーでselectまたはplayに移行
-    switch(code){
-      case K_UP:
-        this.choice = (this.choice + this.choiceLength - 1) % this.choiceLength;
-        break;
-      case K_DOWN:
-        this.choice = (this.choice + 1) % this.choiceLength;
-        break;
-      case K_ENTER:
-        if(this.choice === 0){
-          this.setNextState("selectLevel");
-        }else{
-					// SelectModeからplayに行くときとclearからplayに行くときで処理を若干変える。
-					// 仕事はほぼgameSystemに一任する。
-          this.setNextState("play");
-        }
-        break;
-		}
-	}
-	update(){
-		// まあ、やることは、ないわな・・
-	}
-	draw(){
-    this.gr.image(this.base, 0, 0);
-		let col = [0, 0, 0, 0, 0];
-		col[this.choice] += 255;
-		const left = 35;
-		const top = 80;
-		this.gr.fill(0);
-		this.gr.text("--" + this.levelText +" is choosed--", left + 2, top + 23 - 50);
-		if(col[0] > 0){ this.gr.fill(0); this.gr.rect(left, top, 140, 30); }
-		this.gr.fill(col[0]);
-		this.gr.text(this.txt[0], left + 2, top + 23);
-		for(let k = 1; k < 5; k++){
-			if(col[k] > 0){ this.gr.fill(0); this.gr.rect(left, top + 30 + 50 * k, 103, 30); }
-			this.gr.fill(col[k]);
-			this.gr.text(this.txt[k], left + 2, top + 53 + 50 * k);
-		}
-    image(this.gr, 0, 0);
+// まあ今回はそんな感じで
+function ordinaryPrepare(graphics){
+	for(let gr of graphics){
+		gr.textAlign(CENTER, CENTER);
+		gr.textSize(24);
+		gr.textFont(huiFont);
+		gr.colorMode(HSB, 100);
+		gr.noStroke();
 	}
 }
 
@@ -295,8 +281,8 @@ class Play extends State{
 		switch(_state.name){
 			case "pause":
 			  return;
-			case "selectMode":
-			  this.gameSystem.initialize(_state.choice - 1); // 1を引くって感じで。mode（難易度）設定。
+			case "title":
+			  this.gameSystem.initialize(_state.mode); // 1を引くって感じで。mode（難易度）設定。
 				this.level = _state.level; // レベル番号要るかな・・んー
 				this.stage = 0; // ステージ番号リセット
 				break;
@@ -451,6 +437,9 @@ class Clear extends State{
 	}
 }
 
+// ----------------------------------------------------------------------------------- //
+// gamesystem.
+
 // play内部でこれを呼び出す感じ
 // ライフ上限作ろう。20が上限。それ以上は増やすことを認めない。
 class GameSystem{
@@ -597,6 +586,9 @@ class GameSystem{
 	}
 }
 
+// ----------------------------------------------------------------------------------- //
+// ball.
+
 // グラフィックはとりあえず後でいいです
 // パドルでたたくと2段階までパワーアップ
 // 1段階：スピードが4から6になり攻撃力2になる
@@ -730,6 +722,9 @@ class Ball{
 	}
 }
 
+// ----------------------------------------------------------------------------------- //
+// paddle.
+
 // 0～1のマウス値から位置を出す
 class Paddle{
 	constructor(){
@@ -837,6 +832,9 @@ class ArcPaddle extends Paddle{
 	draw(gr){}
 }
 
+// ----------------------------------------------------------------------------------- //
+// block.
+
 // NORMALとLIFEUPとWALL. まあとりあえずWALLかな
 // さすがにもうグラフィックでいいかなって気がしてきた。多くなるとどうしてもね。
 class Block{
@@ -910,6 +908,9 @@ class Block{
 		gr.rect(diff, diff, w - diff * 2, h - diff * 2);
 	}
 }
+
+// ----------------------------------------------------------------------------------- //
+// gutter.
 
 // colliderデータを受け取ってそれをもとにgrに描画してベースラインとする、そのうえで当たり判定を提供する流れ。
 // glsl使って描画するのもありなんかなとか思ったり
@@ -1048,6 +1049,9 @@ class CircleCollider extends Collider{
 		this.type = "circle";
 	}
 }
+
+// ----------------------------------------------------------------------------------- //
+// interaction.
 
 function keyPressed(){
   mySystem.currentState.keyAction(keyCode);
