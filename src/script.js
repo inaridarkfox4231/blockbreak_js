@@ -23,6 +23,8 @@ const LIFES = [3, 5, 10, 15];
 const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
 // パドル長
 const PADDLE_LENGTH = [80, 60, 40, 30];
+// ブロックヒュー
+const BLOCK_HUE = [18, 10, 0, 78, 65];
 
 // ブロックタイプ定数
 // NORMAL:白、薄い青、濃い青（幅2の厚み、文字無し）、LIFEUP:ピンク（Lの文字）、WALL:灰色（幅5の厚み）
@@ -479,16 +481,22 @@ class GameSystem{
 		this.blocks.push(new Block(0, 3, 1, 20));
 		this.blocks.push(new Block(23, 3, 1, 20));
 		this.blocks.push(new Block(1, 3, 22, 1));
-		this.blocks.push(new Block(6, 6, 2, 1, NORMAL, 1, 65));
-		this.blocks.push(new Block(6, 8, 2, 1, NORMAL, 2, 65));
-		this.blocks.push(new Block(6, 10, 2, 1, NORMAL, 3, 65));
-		this.blocks.push(new Block(8, 6, 2, 1, NORMAL, 1, 77));
-		this.blocks.push(new Block(8, 8, 2, 1, NORMAL, 2, 77));
-		this.blocks.push(new Block(8, 10, 2, 1, NORMAL, 3, 77));
-		this.blocks.push(new Block(10, 6, 2, 1, NORMAL, 1, 5));
-		this.blocks.push(new Block(10, 8, 2, 1, NORMAL, 2, 5));
-		this.blocks.push(new Block(10, 10, 2, 1, NORMAL, 3, 5));
-		this.blocks.push(new Block(13, 5, 1, 2, LIFEUP, 1));
+		this.blocks.push(new Block(6, 7, 2, 1, NORMAL, 1, 65));
+		this.blocks.push(new Block(6, 9, 2, 1, NORMAL, 1, 65));
+		this.blocks.push(new Block(6, 11, 2, 1, NORMAL, 1, 65));
+		this.blocks.push(new Block(8, 7, 2, 1, NORMAL, 2, 77));
+		this.blocks.push(new Block(8, 9, 2, 1, NORMAL, 2, 77));
+		this.blocks.push(new Block(8, 11, 2, 1, NORMAL, 2, 77));
+		this.blocks.push(new Block(10, 7, 2, 1, NORMAL, 3, 5));
+		this.blocks.push(new Block(10, 9, 2, 1, NORMAL, 3, 5));
+		this.blocks.push(new Block(10, 11, 2, 1, NORMAL, 3, 5));
+		this.blocks.push(new Block(12, 7, 2, 1, NORMAL, 4, 5));
+		this.blocks.push(new Block(12, 9, 2, 1, NORMAL, 4, 5));
+		this.blocks.push(new Block(12, 11, 2, 1, NORMAL, 4, 5));
+		this.blocks.push(new Block(14, 7, 2, 1, NORMAL, 5, 5));
+		this.blocks.push(new Block(14, 9, 2, 1, NORMAL, 5, 5));
+		this.blocks.push(new Block(14, 11, 2, 1, NORMAL, 5, 5));
+		this.blocks.push(new Block(13, 5, 2, 1, LIFEUP, 1));
 		this.paddles = [];
 		const paddleLength = PADDLE_LENGTH[this.mode];
 		this.paddles.push(new LinePaddle(20, 460 - paddleLength, 416, 416, paddleLength, 4, -PI/2));
@@ -511,7 +519,7 @@ class GameSystem{
 			this.ball.activate();
 			this.currentPaddleId = -1;
 		}else{
-			for(let pdl of this.paddles){ pdl.activeSwitch(); }
+			for(let pdl of this.paddles){ pdl.activate(); }
 		}
 	}
 	collideWithBlocks(){
@@ -711,6 +719,14 @@ class Ball{
 	}
 	draw(gr){
 		gr.image(this.gr, this.x - this.radius, this.y - this.radius);
+		if(this.level > 0){
+		  gr.stroke(10, 100, 100);
+			gr.noFill();
+		  gr.strokeWeight(2);
+		  const barLength = this.poweredCount * Math.PI * 2 / 240;
+		  gr.arc(this.x, this.y, this.radius * 4, this.radius * 4, -Math.PI / 2, -Math.PI / 2 + barLength);
+		  gr.noStroke();
+		}
 	}
 }
 
@@ -720,12 +736,18 @@ class Paddle{
 	  this.ball = undefined;
 		this.active = false; // active時は色が変わる. activeはクリックで切り替える。
 		this.direction = 0; // lineとarcで若干違う感じ
+		this.activeCount = 0; // 120フレーム
 	}
 	isActive(){
 		return this.active;
 	}
-	activeSwitch(){
-		this.active = !this.active;
+  activate(){
+		if(this.active){ return; }
+		this.active = true;
+		this.activeCount = 120;
+	}
+	inActivate(){
+		this.active = false;
 	}
 	setBall(_ball){
 		this.ball = _ball;
@@ -733,7 +755,14 @@ class Paddle{
 	removeBall(){
 		this.ball = undefined;
 	}
-	update(){}
+	update(){
+		if(this.active){
+			this.activeCount--;
+			if(this.activeCount === 0){
+				this.inActivate();
+			}
+		}
+	}
 }
 
 class LinePaddle extends Paddle{
@@ -824,16 +853,21 @@ class Block{
 		this.gr = createGraphics(this.w, this.h);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
+		this.gr.textSize(22);
+		this.gr.textAlign(CENTER, CENTER);
+		this.gr.textFont(huiFont);
 		this.drawBlockImage();
 	}
 	drawBlockImage(){
 		this.gr.clear();
 		switch(this.blockType){
 			case NORMAL:
-			  Block.normalDraw(this.gr, this.w, this.h, 0.15, this.tough, this.hue);
+			  Block.normalDraw(this.gr, this.w, this.h, 0.15, BLOCK_HUE[this.tough - 1]);
 				break;
 			case LIFEUP:
-			  Block.lifeupDraw(this.gr, this.w, this.h, 0.3);
+			  Block.normalDraw(this.gr, this.w, this.h, 0.15, 88);
+				this.gr.fill(0);
+				this.gr.text("L", this.w * 0.5, this.h * 0.35);
 				break;
 			case WALL:
 			  Block.wallDraw(this.gr, this.w, this.h, 0.3);
@@ -849,36 +883,21 @@ class Block{
 	hitWithBall(_ball){
 		if(this.tough > 2 && _ball.attack < 2){ return; }
 		this.tough -= _ball.attack;
-		this.drawBlockImage();
-		if(this.tough <= 0){ this.kill(); }
+		if(this.tough <= 0){ this.kill(); return; }
+		// returnしないと実行されちゃうでしょこの馬鹿！！！！！！
+		this.drawBlockImage(); // killの後に描かないとエラーになる。当たり前。
 	}
 	draw(gr){
 		gr.image(this.gr, this.x, this.y);
 	}
-	static normalDraw(gr, w, h, ratio, tough, hue){
+	static normalDraw(gr, w, h, ratio, hue){
 		const diff = ratio * GRIDSIZE;
-		const sat = 50 * tough - 50;
-		const blight = 100;
-		gr.fill(hue, sat * 0.5, blight);
+		gr.fill(hue, 50, 100);
 		gr.rect(0, 0, w, h);
-		gr.fill(hue, sat, blight * 0.5);
+		gr.fill(hue, 100, 50);
 		gr.rect(diff, diff, w - diff, h - diff);
-		gr.fill(hue, sat, blight);
+		gr.fill(hue, 100, 100);
 		gr.rect(diff, diff, w - diff * 2, h - diff * 2);
-	}
-	static lifeupDraw(gr, w, h, ratio){
-		// 1UPは丸っこくする
-		const diff = ratio * GRIDSIZE;
-		const hue = 88;
-		const sat = 100;
-		const blight = 100;
-		const round = GRIDSIZE * 0.5;
-		gr.fill(hue, sat * 0.5, blight);
-		gr.rect(0, 0, w, h, round);
-		gr.fill(hue, sat, blight * 0.5);
-		gr.rect(diff, diff, w - diff, h - diff, round);
-		gr.fill(hue, sat, blight);
-		gr.rect(diff, diff, w - diff * 2, h - diff * 2, round);
 	}
 	static wallDraw(gr, w, h, ratio){
 		gr.clear();
