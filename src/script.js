@@ -461,10 +461,10 @@ class GameSystem{
 	}
 	setPattern(id){
 		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
-		this.gr = createGraphics(480, 460);
+		this.gr = createGraphics(480, 448);
 		this.gr.noStroke();
 		this.ball.initialize(); // ボールの初期化
-		const colliders = [new RectCollider(20, 440, 440, 20)];
+		const colliders = [new RectCollider(20, 428, 440, 20)];
 		this.gutter.setting(480, 460, colliders);
 		this.blocks = [];
 		this.blocks.push(new Block(0, 3, 1, 20));
@@ -744,6 +744,7 @@ class LinePaddle extends Paddle{
 	}
 }
 
+// アークパドル。
 class ArcPaddle extends Paddle{
 
 }
