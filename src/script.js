@@ -450,6 +450,7 @@ class Clear extends State{
 }
 
 // play内部でこれを呼び出す感じ
+// ライフ上限作ろう。20が上限。それ以上は増やすことを認めない。
 class GameSystem{
 	constructor(){
 		this.gr = undefined; // グラフィック
@@ -470,6 +471,7 @@ class GameSystem{
 		this.stage = stage; // 描画用
 		this.gr = createGraphics(480, 448);
 		this.gr.noStroke();
+		this.gr.colorMode(HSB, 100);
 		this.ball.initialize(); // ボールの初期化
 		const colliders = [new RectCollider(20, 428, 440, 20)];
 		this.gutter.setting(480, 460, colliders);
@@ -477,10 +479,16 @@ class GameSystem{
 		this.blocks.push(new Block(0, 3, 1, 20));
 		this.blocks.push(new Block(23, 3, 1, 20));
 		this.blocks.push(new Block(1, 3, 22, 1));
-		this.blocks.push(new Block(8, 8, 2, 1, NORMAL, 1));
-		this.blocks.push(new Block(8, 6, 2, 1, NORMAL, 2));
-		this.blocks.push(new Block(8, 12, 2, 1, NORMAL, 3));
-		this.blocks.push(new Block(13, 8, 1, 2, LIFEUP, 1));
+		this.blocks.push(new Block(6, 6, 2, 1, NORMAL, 1, 65));
+		this.blocks.push(new Block(6, 8, 2, 1, NORMAL, 2, 65));
+		this.blocks.push(new Block(6, 10, 2, 1, NORMAL, 3, 65));
+		this.blocks.push(new Block(8, 6, 2, 1, NORMAL, 1, 77));
+		this.blocks.push(new Block(8, 8, 2, 1, NORMAL, 2, 77));
+		this.blocks.push(new Block(8, 10, 2, 1, NORMAL, 3, 77));
+		this.blocks.push(new Block(10, 6, 2, 1, NORMAL, 1, 5));
+		this.blocks.push(new Block(10, 8, 2, 1, NORMAL, 2, 5));
+		this.blocks.push(new Block(10, 10, 2, 1, NORMAL, 3, 5));
+		this.blocks.push(new Block(13, 5, 1, 2, LIFEUP, 1));
 		this.paddles = [];
 		const paddleLength = PADDLE_LENGTH[this.mode];
 		this.paddles.push(new LinePaddle(20, 460 - paddleLength, 416, 416, paddleLength, 4, -PI/2));
@@ -569,13 +577,13 @@ class GameSystem{
 		for(let b of this.blocks){ b.draw(this.gr); }
 		for(let pdl of this.paddles){ pdl.draw(this.gr); }
 		if(this.ball.isAlive()){ this.ball.draw(this.gr); }
-		this.gr.fill(255);
+		this.gr.fill(0, 0, 100);
 		// ステージ番号を描画
 		// スコアを描画
 		// ライフを描画
 		for(let k = 0; k < this.ball.getLife(); k++){
-			let cx = 120 + 30 * (k % 12) + 15;
-			let cy = Math.floor(k / 12) * 30 + 15;
+			let cx = 180 + 30 * (k % 10) + 15;
+			let cy = Math.floor(k / 10) * 30 + 15;
 			this.gr.circle(cx, cy, 25);
 		}
 	}
@@ -599,6 +607,23 @@ class Ball{
 		this.radius = 8;
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0; // 240カウントごとにレベルが下がる
+		this.gr = createGraphics(this.radius * 2, this.radius * 2);
+		this.grList = createGraphics(this.radius * 4, this.radius * 2);
+		this.grList.colorMode(HSB, 100);
+		this.grList.noStroke();
+		this.prepareBallGraphics();
+		this.gr.image(this.grList, 0, 0);
+	}
+	prepareBallGraphics(){
+		let g = this.grList;
+		for(let i = 0; i < this.radius * 2; i++){
+			g.fill(50 + i * 25 / this.radius);
+			g.circle(this.radius, this.radius, this.radius * 2 - i);
+		}
+		for(let i = 0; i < this.radius * 2; i++){
+			g.fill(10, 100 - i * 50 / this.radius, 100);
+			g.circle(this.radius * 3, this.radius, this.radius * 2 - i);
+		}
 	}
 	getLife(){
 		return this.life;
@@ -626,6 +651,9 @@ class Ball{
 	setStatus(){
 		this.speed = STATUS.speed[this.level];
 		this.attack = STATUS.attack[this.level];
+		const diam = this.radius * 2;
+		this.gr.clear();
+		this.gr.image(this.grList, 0, 0, diam, diam, diam * this.level, 0, diam, diam);
 	}
 	hitWithBlock(_block){
 		// LIFEUPでライフ回復。まあそのくらい。
@@ -648,8 +676,7 @@ class Ball{
 		// 最終的にはガターにぶつかってパーティクルが出てそれが済んでからこれをやる。
 		this.alive = true;
 		this.level = 0;
-		this.attack = 1;
-		this.speed = 4;
+		this.setStatus();
 		this.active = false;
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0;
@@ -683,11 +710,7 @@ class Ball{
 		this.y += this.speed * sin(this.direction);
 	}
 	draw(gr){
-		switch(this.level){
-			case 0: gr.fill(128); break;
-			case 1: gr.fill(255, 128, 0); break;
-		}
-		gr.circle(this.x, this.y, this.radius * 2);
+		gr.image(this.gr, this.x - this.radius, this.y - this.radius);
 	}
 }
 
@@ -743,10 +766,10 @@ class LinePaddle extends Paddle{
 		                 this.y + 0.5 * this.h + (0.5 * this.h + this.ball.radius) * sin(this.direction));
 	}
 	draw(gr){
-		if(this.active){ gr.fill(255, 242, 0); }else{ gr.fill(255); }
+		if(this.active){ gr.fill(15, 100, 100); }else{ gr.fill(15, 0, 100); }
 		gr.rect(this.x, this.y, this.w, this.h);
 		if(this.ball !== undefined){
-		  gr.stroke(255);
+		  gr.stroke(0, 0, 100);
 		  gr.strokeWeight(2);
 		  gr.line(this.ball.x, this.ball.y,
 				      this.ball.x + this.w * cos(this.ball.direction), this.ball.y + this.w * sin(this.ball.direction));
@@ -786,26 +809,36 @@ class ArcPaddle extends Paddle{
 }
 
 // NORMALとLIFEUPとWALL. まあとりあえずWALLかな
+// さすがにもうグラフィックでいいかなって気がしてきた。多くなるとどうしてもね。
 class Block{
-	constructor(gridX, gridY, gridW, gridH, blockType = WALL, tough = Infinity){
+	constructor(gridX, gridY, gridW, gridH, blockType = WALL, tough = Infinity, hue = 0){
 		this.x = gridX * GRIDSIZE;
 		this.y = gridY * GRIDSIZE;
 		this.w = gridW * GRIDSIZE;
 		this.h = gridH * GRIDSIZE;
 		this.blockType = blockType;
 		this.tough = tough;
+		this.hue = hue;
 		this.alive = true;
 		this.collider = new RectCollider(this.x, this.y, this.w, this.h);
+		this.gr = createGraphics(this.w, this.h);
+		this.gr.noStroke();
+		this.gr.colorMode(HSB, 100);
+		this.drawBlockImage();
 	}
-	orthodoxDraw(gr, ratio, col1, col2, col3, round = 0){
-		// 1UPは丸っこくする
-		const diff = ratio * GRIDSIZE;
-		gr.fill(...col1);
-		gr.rect(this.x, this.y, this.w, this.h, round);
-		gr.fill(...col2);
-		gr.rect(this.x + diff, this.y + diff, this.w - diff, this.h - diff, round);
-		gr.fill(...col3);
-		gr.rect(this.x + diff, this.y + diff, this.w - diff * 2, this.h - diff * 2, round);
+	drawBlockImage(){
+		this.gr.clear();
+		switch(this.blockType){
+			case NORMAL:
+			  Block.normalDraw(this.gr, this.w, this.h, 0.15, this.tough, this.hue);
+				break;
+			case LIFEUP:
+			  Block.lifeupDraw(this.gr, this.w, this.h, 0.3);
+				break;
+			case WALL:
+			  Block.wallDraw(this.gr, this.w, this.h, 0.3);
+				break;
+		}
 	}
 	isAlive(){
 		return this.alive;
@@ -814,23 +847,48 @@ class Block{
 		this.alive = false;
 	}
 	hitWithBall(_ball){
-		if(this.tough - _ball.attack > 1){ return; }
+		if(this.tough > 2 && _ball.attack < 2){ return; }
 		this.tough -= _ball.attack;
+		this.drawBlockImage();
 		if(this.tough <= 0){ this.kill(); }
 	}
 	draw(gr){
-		switch(this.blockType){
-			case WALL:
-			  this.orthodoxDraw(gr, 0.3, [180, 180, 180], [60, 60, 60], [120, 120, 120]);
-				break;
-			case NORMAL:
-			  const diff = (this.tough - 1) * 80;
-			  this.orthodoxDraw(gr, 0.15, [240 - diff, 250 - diff, 250], [160 - diff, 200 - diff, 250], [200 - diff, 230 - diff, 255]);
-				break;
-			case LIFEUP:
-			  this.orthodoxDraw(gr, 0.3, [250, 140, 170], [230, 0, 74], [255, 72, 132], GRIDSIZE * 0.5);
-				break;
-		}
+		gr.image(this.gr, this.x, this.y);
+	}
+	static normalDraw(gr, w, h, ratio, tough, hue){
+		const diff = ratio * GRIDSIZE;
+		const sat = 50 * tough - 50;
+		const blight = 100;
+		gr.fill(hue, sat * 0.5, blight);
+		gr.rect(0, 0, w, h);
+		gr.fill(hue, sat, blight * 0.5);
+		gr.rect(diff, diff, w - diff, h - diff);
+		gr.fill(hue, sat, blight);
+		gr.rect(diff, diff, w - diff * 2, h - diff * 2);
+	}
+	static lifeupDraw(gr, w, h, ratio){
+		// 1UPは丸っこくする
+		const diff = ratio * GRIDSIZE;
+		const hue = 88;
+		const sat = 100;
+		const blight = 100;
+		const round = GRIDSIZE * 0.5;
+		gr.fill(hue, sat * 0.5, blight);
+		gr.rect(0, 0, w, h, round);
+		gr.fill(hue, sat, blight * 0.5);
+		gr.rect(diff, diff, w - diff, h - diff, round);
+		gr.fill(hue, sat, blight);
+		gr.rect(diff, diff, w - diff * 2, h - diff * 2, round);
+	}
+	static wallDraw(gr, w, h, ratio){
+		gr.clear();
+		const diff = ratio * GRIDSIZE;
+		gr.fill(75);
+		gr.rect(0, 0, w, h);
+		gr.fill(25);
+		gr.rect(diff, diff, w - diff, h - diff);
+		gr.fill(50);
+		gr.rect(diff, diff, w - diff * 2, h - diff * 2);
 	}
 }
 
