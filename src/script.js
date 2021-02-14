@@ -21,6 +21,8 @@ const K_SPACE = 32;
 const LIFES = [3, 5, 10, 15];
 // ステータス
 const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
+// パドル長
+const PADDLE_LENGTH = [80, 60, 40, 30];
 
 // ブロックタイプ定数
 // NORMAL:白、薄い青、濃い青（幅2の厚み、文字無し）、LIFEUP:ピンク（Lの文字）、WALL:灰色（幅5の厚み）
@@ -297,7 +299,7 @@ class Play extends State{
 				this.stage = 0; // ステージ番号リセット
 				break;
 		}
-		this.gameSystem.setPattern(this.level * 5 + this.stage); // レベルとステージからレベル*5＋ステージで番号(0～24)
+		this.gameSystem.setPattern(this.level, this.stage); // レベルとステージは両方必要
 		this.offSet = this.gameSystem.getOffSet(); // オフセットを計算する
 
 		this.preAnimationSpan = 60; // 0になるまでいろいろキャンセルしてステージ番号を表示
@@ -458,9 +460,14 @@ class GameSystem{
 		this.paddles = []; // パドル
 		this.ball = new Ball(); // ボール
 		this.currentPaddleId = -1; // ボールが属するパドルのid. シフトキーで移動させるのに使う可能性がある
+		this.level = 0;
+		this.stage = 0;
 	}
-	setPattern(id){
-		// idによりjsonからステージシードを引き出す：const seed = stageData["stage" + id];：こんな感じ
+	setPattern(level, stage){
+		// levelとstageによりjsonからステージシードを引き出す：
+		// const seed = stageData["level" + level]["stage" + stage];
+		this.level = level; // 描画用
+		this.stage = stage; // 描画用
 		this.gr = createGraphics(480, 448);
 		this.gr.noStroke();
 		this.ball.initialize(); // ボールの初期化
@@ -475,7 +482,8 @@ class GameSystem{
 		this.blocks.push(new Block(8, 12, 2, 1, NORMAL, 3));
 		this.blocks.push(new Block(13, 8, 1, 2, LIFEUP, 1));
 		this.paddles = [];
-		this.paddles.push(new LinePaddle(20, 420, 416, 416, 40, 4, -PI/2));
+		const paddleLength = PADDLE_LENGTH[this.mode];
+		this.paddles.push(new LinePaddle(20, 460 - paddleLength, 416, 416, paddleLength, 4, -PI/2));
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
 	}
@@ -562,9 +570,12 @@ class GameSystem{
 		for(let pdl of this.paddles){ pdl.draw(this.gr); }
 		if(this.ball.isAlive()){ this.ball.draw(this.gr); }
 		this.gr.fill(255);
+		// ステージ番号を描画
+		// スコアを描画
+		// ライフを描画
 		for(let k = 0; k < this.ball.getLife(); k++){
-			let cx = 120 + 30 * k + 15;
-			let cy = 0 + 15;
+			let cx = 120 + 30 * (k % 12) + 15;
+			let cy = Math.floor(k / 12) * 30 + 15;
 			this.gr.circle(cx, cy, 25);
 		}
 	}
@@ -744,9 +755,34 @@ class LinePaddle extends Paddle{
 	}
 }
 
-// アークパドル。
+// アークパドル。(mx, my)に対しては(0.5, 0.5)を中心として角度を割り出しそれに基づいて位置を決める感じ
+// directionFlagは1なら内向きで0なら外向き。0というのはつまり方向そのまんまって意味ね。1の場合はPIを足すと。
+// 厚さ4の円弧。描画はラインでやる。
+// めんどくさいからまた今度ね
 class ArcPaddle extends Paddle{
-
+	constructor(cx, cy, r, w, directionFlag){
+		super();
+		this.cx = cx;
+		this.cy = cy;
+		this.r = r;
+		this.w = w;
+		this.t1 = -w * 0.5 / r;
+		this.t2 = w * 0.5 / r;
+		this.directionFlag = directionFlag; // 内向きか外向きかって話. 0なら外向き、1なら内向き。これのPI倍を足せばいい。
+		this.direction = directionFlag * Math.PI;
+		// パドルなので4で固定ね
+		this.collider = new ArcCollider(this.cx, this.cy, this.r, 4, this.t1, this.t2);
+	}
+	move(mx, my){
+		// まず(0.5, 0.5)を中心とする方向を割り出す
+		const t = atan2(my - 0.5, mx - 0.5);
+		this.t1 = t - this.w * 0.5 / this.r;
+		this.t2 = t + this.w * 0.5 / this.r;
+		this.direction = t + directionFlag * Math.PI;
+		this.collider.update(this.t1, this.t2);
+	}
+	updateBall(){}
+	draw(gr){}
 }
 
 // NORMALとLIFEUPとWALL. まあとりあえずWALLかな
@@ -881,11 +917,42 @@ class RectCollider extends Collider{
 	}
 }
 
-// 厚みが必要。バームクーヘン的な。パドル専用。
+// 厚みが必要。バームクーヘン的な。パドル専用。厚みは4で固定・・んー。
 class ArcCollider extends Collider{
-  constructor(){
+  constructor(cx, cy, r, h, t1, t2){
 		super();
 		this.type = "arc";
+		this.cx = cx;
+		this.cy = cy;
+		this.r = r;
+		this.h = h;
+		this.t1 = t1;
+		this.t2 = t2;
+	}
+	update(t1, t2){
+		this.t1 = t1;
+		this.t2 = t2;
+	}
+	collideWithBall(_ball){
+		// 速度を足す。
+		const d = _ball.direction;
+		const postX = _ball.x + _ball.speed * cos(d);
+		const postY = _ball.y + _ball.speed * sin(d);
+		// ボールの中心の方向がt1-diff～t2+diffの範囲内にあるか調べる。
+		// diffはthis.h/2に相当する長さの角度のずれ、要するにthis.h / (2 * this.r)ね。
+		// あったとして、今度は中心からの距離を取り、this.rとの差が、絶対値が、厚さの半分と半径の和より大きいならfalse.
+		// 扇形はそれほど大きいものを想定していないので範囲内かどうかについてはcosの値で判定すればOK.
+		const diff = this.h / (2 * this.r);
+		const ballDir = atan2(_ball.y - this.cy, _ball.x - this.cx);
+		if(Math.cos(ballDir - diff - (this.t1 + this.t2) * 0.5) < Math.cos(diff + (this.t2 - this.t1) * 0.5)){ return false; }
+		const ballDistance = dist(_ball.x, _ball.y, this.cx, this.cy);
+		if(abs(ballDistance - this.r) > this.h * 0.5 + _ball.radius){ return false; }
+		return true;
+	}
+	reflect(_ball){
+		// 中心がdiffの内側なら普通に反射する感じ
+		// はじっこのときは然るべく反射する
+		// 外側か内側かで向きが変わるので注意
 	}
 }
 
