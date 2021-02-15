@@ -165,6 +165,106 @@ const fsLava =
 "}";
 
 // ----------------------------------------------------------------------------------- //
+// titleShader.
+
+let vsTitle =
+"precision mediump float;" +
+"attribute vec3 aPosition;" +
+"void main(void){" +
+"  gl_Position = vec4(aPosition, 1.0);" +
+"}";
+
+let fsTitle =
+"precision mediump float;" +
+"uniform vec2 u_resolution;" +
+"uniform vec2 u_seed;" +
+"const float pi = 3.14159;" +
+"const vec2 r_vector = vec2(12.9898, 78.233);" +
+"const float r_coeff = 43758.5453123;" +
+"const int octaves = 6;" +
+// 茶色
+"const vec3 brown = vec3(0.725, 0.479, 0.341);" +
+// 2Dランダムベクトル(-1.0～1.0)
+"vec2 random2(vec2 st){" +
+"  vec2 v = vec2(0.0);" +
+"  v.x = sin(dot(st, vec2(127.1, 311.7))) * r_coeff;" +
+"  v.y = sin(dot(st, vec2(269.5, 183.3))) * r_coeff;" +
+"  return -1.0 + 2.0 * fract(v);" + // -1.0～1.0に正規化
+"}" +
+// gradient noise. (-1.0～1.0)
+// 各頂点からのベクトルを各頂点におけるベクトルに掛けて内積を作る。
+"float dnoise(vec2 p){" +
+"  vec2 i = floor(p);" +
+"  vec2 f = fract(p);" +
+"  vec2 u = f * f * (3.0 - 2.0 * f);" +
+"  vec2 p_00 = vec2(0.0, 0.0);" +
+"  vec2 p_01 = vec2(0.0, 1.0);" +
+"  vec2 p_10 = vec2(1.0, 0.0);" +
+"  vec2 p_11 = vec2(1.0, 1.0);" +
+"  float value_00 = dot(random2(i + p_00), f - p_00);" +
+"  float value_01 = dot(random2(i + p_01), f - p_01);" +
+"  float value_10 = dot(random2(i + p_10), f - p_10);" +
+"  float value_11 = dot(random2(i + p_11), f - p_11);" +
+"  return mix(mix(value_00, value_10, u.x), mix(value_01, value_11, u.x), u.y);" +
+"}" +
+// fbmやってみる
+"float fbm(vec2 st){" +
+"  float value = 0.0;" +
+"  float amplitude = 0.5;" +
+"  for(int i = 0; i < octaves; i++){" +
+"    value += amplitude * dnoise(st);" +
+"    st *= 2.0;" +
+"    amplitude *= 0.5;" +
+"  }" +
+"  return value;" +
+"}" +
+// fbm_ridge
+"float fbm_ridge(vec2 st){" +
+"  float value = 0.0;" +
+"  float amplitude = 0.5;" +
+"  for(int i = 0; i < octaves; i++){" +
+"    value += abs(amplitude * dnoise(st));" +
+"    st *= 2.0;" +
+"    amplitude *= 0.5;" +
+"  }" +
+"  return value;" +
+"}" +
+// hsbで書かれた(0.0～1.0)の数値vec3をrgbに変換する魔法のコード
+"vec3 getHSB(float r, float g, float b){" +
+"    vec3 c = vec3(r, g, b);" +
+"    vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);" +
+"    rgb = rgb * rgb * (3.0 - 2.0 * rgb);" +
+"    return c.z * mix(vec3(1.0), rgb, c.y);" +
+"}" +
+"void main(void){" +
+"  vec2 p = gl_FragCoord.xy * 0.5 / min(u_resolution.x, u_resolution.y);" +
+// シードをレンガごとに変える、あとこれを使って最後にグリッドを引く。
+"  vec2 q = p * 20.0 + vec2(0.3, 0.4);" +
+"  if(fract(0.5 * q.y) > 0.5){ q.x += 1.0; }" +
+"  vec2 st = p + u_seed + random2(vec2(floor(0.5 * q.x), floor(q.y))) * 5.0;" +
+"  st *= 8.0;" + // 細かさ。大きいほど細かくなる。
+// fbmにより-1.0～1.0の値を出してから0.0～1.0に正規化
+"  float n = fbm(st) * 0.5 + 0.5;" +
+"  n = n * n * (3.0 - 2.0 * n);" +
+"  float sat = 1.0;" +
+"  float bl = 1.0;" +
+"  float hue = 0.55;" +
+// skyColorは0.55～0.58のグラデーションで
+"  vec3 baseColor = vec3(0.75);" +
+// cloudColorは白・・
+"  vec3 blockColor = brown;" +
+// 最終的な色・・
+"  vec3 col;" +
+// nが0.4以下の所はskyColor, 0.6以上の所はcloudColorで、間の所は
+// smoothstepでblendしてみる。
+"  col = baseColor + (blockColor - baseColor) * smoothstep(0.42, 0.58, n);" +
+"  vec4 finalColor = vec4(col, 1.0);" +
+// グリッド
+"  if(fract(0.5 * q.x) < 0.05 || fract(q.y) < 0.1){ finalColor = vec4(brown * 0.5, 1.0); }" +
+"  gl_FragColor = finalColor;" +
+"}";
+
+// ----------------------------------------------------------------------------------- //
 // sound関連.
 let myMusic;
 let codes = [];
@@ -301,6 +401,15 @@ class Title extends State{
 		this.modeSpace = createGraphics(70 + 350, 40);
 		this.playButton = createGraphics(120, 60);
 		this.drawPrepare();
+		this.bg = createGraphics(CANVAS_W, CANVAS_H, WEBGL); // 背景
+		this.createBackground();
+	}
+	createBackground(){
+		let bgShader = this.bg.createShader(vsTitle, fsTitle);
+		this.bg.shader(bgShader);
+		bgShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
+		bgShader.setUniform("seed", [Math.random() * 99, Math.random() * 99]);
+		this.bg.quad(-1, -1, -1, 1, 1, 1, 1, -1);
 	}
 	drawNonActiveButton(gr, x, y, txt){
 		gr.fill(50);
@@ -340,6 +449,8 @@ class Title extends State{
 				this.drawNonActiveButton(this.levelSpace, 80 + 90 * i, 0, "Lv." + i);
 			}
 		}
+		this.levelSpace.fill(255);
+		this.levelSpace.text("LEVEL:", 40 + 2, 20 + 2);
 		this.levelSpace.fill(0);
 		this.levelSpace.text("LEVEL:", 40, 20);
 	}
@@ -352,6 +463,8 @@ class Title extends State{
 				this.drawNonActiveButton(this.modeSpace, 70 + 90 * i, 0, MODE_TEXT[i]);
 			}
 		}
+		this.modeSpace.fill(255);
+		this.modeSpace.text("MODE:", 35 + 2, 20 + 2);
 		this.modeSpace.fill(0);
 		this.modeSpace.text("MODE:", 35, 20);
 	}
@@ -363,6 +476,8 @@ class Title extends State{
 		this.playButton.triangle(120, 0, 0, 60, 120, 60);
 		this.playButton.fill(0, 100, 100);
 		this.playButton.rect(12, 6, 96, 48);
+		this.playButton.fill(255);
+		this.playButton.text("play", 60 + 2, 24 + 2);
 		this.playButton.fill(0);
 		this.playButton.text("play", 60, 24);
 	}
@@ -411,10 +526,16 @@ class Title extends State{
 	}
 	update(){}
 	draw(){
-		this.gr.background(200, 200, 255);
-		this.gr.textSize(80);
+		this.gr.image(this.bg, 0, 0);
+		this.gr.fill(255);
+		this.gr.textSize(90);
+		this.gr.text("BLOCKBREAK", 400 + 2, 80 + 2);
+		this.gr.textSize(45);
+		this.gr.text("----CLICK PLAY BUTTON----", 402, 202);
+		this.gr.fill(0);
+		this.gr.textSize(90);
 		this.gr.text("BLOCKBREAK", 400, 80);
-		this.gr.textSize(40);
+		this.gr.textSize(45);
 		this.gr.text("----CLICK PLAY BUTTON----", 400, 200);
 		this.gr.image(this.levelSpace, 400 - 40 - 220, 320 - 20);
 		this.gr.image(this.modeSpace, 400 - 35 - 175, 420 - 20);
