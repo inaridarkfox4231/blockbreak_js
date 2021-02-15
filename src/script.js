@@ -29,6 +29,8 @@ const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
 const PADDLE_LENGTH = [80, 60, 40, 30];
 // ブロックヒュー
 const BLOCK_HUE = [18, 10, 0, 78, 65];
+// ブロックやボールが壊れるときの色パレット（黄色、オレンジ、赤、紫、青、ピンク、灰色、ライム）
+const BREAK_PALETTE = ["#fff000", "#ffa500", "#ff0000", "#800080", "#0000cd", "#ff1493", "#888", "lime"];
 // モードテキスト
 const MODE_TEXT = ["EASY", "NORMAL", "HARD", "CRAZY"];
 const MODE_HUE = [40, 55, 70, 85]
@@ -43,6 +45,19 @@ const NORMAL = 0;
 const LIFEUP = 1;
 const WALL = 2;
 
+// particle関連
+// 色に関してはパレットを使ってRGBでやってるっぽいので
+// パーティクル専用のgr作ってそこに全部描いて乗せる方法で行くか
+let particlePool;
+const EMPTY_SLOT = Object.freeze(Object.create(null)); // ダミーオブジェクト
+
+const PARTICLE_LIFE = 60; // 寿命
+const PARTICLE_ROTATION_SPEED = 0.12; // 形状の回転スピード
+const MIN_DISTANCE = 30; // 到達距離
+const MAX_DISTANCE = 60;
+const MIN_RADIUS = 6; // 大きさ
+const MAX_RADIUS = 24;
+
 let huiFont;
 
 // ----------------------------------------------------------------------------------- //
@@ -54,6 +69,7 @@ function preload(){
 
 function setup() {
 	createCanvas(CANVAS_W, CANVAS_H);
+	particlePool = new ObjectPool(() => { return new Particle(); }, 512);
 	mySystem = new System();
 }
 
@@ -307,8 +323,10 @@ class Play extends State{
 			this.preAnimationSpan--;
 			return;
 		}
-		// ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
+
 		this.gameSystem.update();
+
+		// ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
 		if(this.gameSystem.gameoverCheck()){
 			this.setNextState("gameover");
 		}
@@ -454,18 +472,26 @@ class GameSystem{
 		this.currentPaddleId = -1; // ボールが属するパドルのid. シフトキーで移動させるのに使う可能性がある
 		this.level = 0;
 		this.stage = 0;
+		// パーティクルシステム
+		// システム側に画像を持たせてそれを乗せるか。
+		this.particles = new ParticleSystem();
 	}
 	setPattern(level, stage){
 		// levelとstageによりjsonからステージシードを引き出す：
 		// const seed = stageData["level" + level]["stage" + stage];
 		this.level = level; // 描画用
 		this.stage = stage; // 描画用
+		// グラフィック
 		this.gr = createGraphics(480, 448);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
+		this.particles.setGraphic(480, 448); // ここに毎フレーム描画する感じね
+		// ボール
 		this.ball.initialize(); // ボールの初期化
+		// ガター
 		const colliders = [new RectCollider(20, 428, 440, 20)];
 		this.gutter.setting(480, 460, colliders);
+		// ブロック
 		this.blocks = [];
 		this.blocks.push(new Block(0, 3, 1, 20));
 		this.blocks.push(new Block(23, 3, 1, 20));
@@ -486,6 +512,7 @@ class GameSystem{
 		this.blocks.push(new Block(14, 9, 2, 1, NORMAL, 5, 5));
 		this.blocks.push(new Block(14, 11, 2, 1, NORMAL, 5, 5));
 		this.blocks.push(new Block(13, 5, 2, 1, LIFEUP, 1));
+		// パドル
 		this.paddles = [];
 		const paddleLength = PADDLE_LENGTH[this.mode];
 		this.paddles.push(new LinePaddle(20, 460 - paddleLength, 416, 416, paddleLength, 4, -PI/2));
@@ -511,10 +538,37 @@ class GameSystem{
 			for(let pdl of this.paddles){ pdl.activate(); }
 		}
 	}
+	getCollidePoint(){
+		return {x:this.ball.x + this.ball.radius * Math.cos(this.ball.direction),
+			      y:this.ball.y + this.ball.radius * Math.sin(this.ball.direction)};
+	}
+	createBallParticle(p, drawFunction, particleNum){
+		// ボールのパーティクル
+		this.particles.createParticle(p.x, p.y, color(BREAK_PALETTE[6 + this.ball.level]), drawFunction, particleNum);
+	}
+	createBlockParticle(p, id, particleNum){
+		// ブロックのパーティクル
+		// のちに円形ブロック使うようになったらまた変わるかもだけどね。円形には当たると強制アクティベートの付加効果を持たせるつもり
+		this.particles.createParticle(p.x, p.y, color(BREAK_PALETTE[id]), drawStar, particleNum);
+	}
 	collideWithBlocks(){
+		// 衝突時はボール側だけパーティクル出そうか（小さいの）
+		// 壊れるようなら・・その分も出す。
 		for(let b of this.blocks){
 			if(b.collider.collideWithBall(this.ball)){
+				// 先にパーティクル出さないと壊れた後のtoughが参照されちゃうのでダメ
+				// toughは1ベースなのでそこ注意かな・・んー。
+				const p = this.getCollidePoint();
+				// ボール側
+				this.createBallParticle(p, drawCross, 5);
+				// ブロック側は壊れるかどうかで場合分け。壊れないなら5個しか出さない方向で。
+				const id = b.getId();
 				b.hitWithBall(this.ball);
+				if(b.isAlive()){
+					this.createBlockParticle(p, id, 5);
+				}else{
+					this.createBlockParticle(p, id, 20);
+				}
 				this.ball.hitWithBlock(b);
 				b.collider.reflect(this.ball);
 				break;
@@ -529,6 +583,9 @@ class GameSystem{
 	collideWithPaddles(){
 		for(let pdl of this.paddles){
 			if(pdl.collider.collideWithBall(this.ball)){
+				// ボール側
+				const p = this.getCollidePoint();
+				this.createBallParticle(p, drawCross, 5);
 				this.ball.hitWithPaddle(pdl);
 				pdl.collider.reflect(this.ball);
 				break;
@@ -536,6 +593,8 @@ class GameSystem{
 		}
 	}
 	update(){
+		this.particles.update(); // パーティクルのアップデート
+		this.particles.remove(); // パーティクルのリムーブ
 		if(!this.ball.isAlive()){ return; }
 		const offSet = this.getOffSet();
 		const mx = constrain((mouseX - offSet.x) / this.gr.width, 0, 1);
@@ -548,11 +607,16 @@ class GameSystem{
 		this.ball.update();
 		if(this.ball.isActive()){
 			if(this.gutter.check(this.ball)){
+				// ボールがやられるときのパーティクルは6番以降の色を使う。三角形。
+				const p = this.getCollidePoint();
+				this.createBallParticle(p, drawTriangle, 20);
 				this.ball.kill();
 			}
 		}
 	}
 	gameoverCheck(){
+		// ここでパーティクルが残ってたら移動しないようにする・・
+		if(!this.particles.isEmpty()){ return false; }
 		if(this.ball.isAlive()){ return false; }
 		if(!this.ball.isAlive() && this.ball.getLife() > 0){
       this.ball.initialize();
@@ -563,17 +627,25 @@ class GameSystem{
 		return true;
 	}
 	clearCheck(){
+		// パーティクルが残ってたら移動しないようにする・・
+		if(!this.particles.isEmpty()){ return false; }
 		for(let b of this.blocks){
 			if(b.blockType === NORMAL){ return false; }
 		}
 		return true;
 	}
 	draw(){
+		// 背景
 		this.gr.background(0);
+		// ガター
 		this.gutter.draw(this.gr);
+		// ブロック、パドル、ボール
 		for(let b of this.blocks){ b.draw(this.gr); }
 		for(let pdl of this.paddles){ pdl.draw(this.gr); }
 		if(this.ball.isAlive()){ this.ball.draw(this.gr); }
+		// パーティクルの描画
+		this.particles.draw(this.gr);
+		// コンフィグパート
 		this.gr.fill(0, 0, 100);
 		// ステージ番号を描画
 		// スコアを描画
@@ -621,7 +693,7 @@ class Ball{
 			g.circle(this.radius, this.radius, this.radius * 2 - i);
 		}
 		for(let i = 0; i < this.radius * 2; i++){
-			g.fill(10, 100 - i * 50 / this.radius, 100);
+			g.fill(25, 100 - i * 50 / this.radius, 100);
 			g.circle(this.radius * 3, this.radius, this.radius * 2 - i);
 		}
 	}
@@ -712,7 +784,7 @@ class Ball{
 	draw(gr){
 		gr.image(this.gr, this.x - this.radius, this.y - this.radius);
 		if(this.level > 0){
-		  gr.stroke(10, 100, 100);
+		  gr.stroke(25, 100, 100);
 			gr.noFill();
 		  gr.strokeWeight(2);
 		  const barLength = this.poweredCount * Math.PI * 2 / 240;
@@ -856,6 +928,17 @@ class Block{
 		this.gr.textFont(huiFont);
 		this.drawBlockImage();
 	}
+	getId(){
+		// パーティクル出力用のidを返す関数
+		switch(this.blockType){
+			case NORMAL:
+			  return this.tough - 1; // toughは1,2,3,4,5であることが前提
+			case LIFEUP:
+			  return 5;
+			case WALL:
+			  return 6;
+		}
+	}
 	drawBlockImage(){
 		this.gr.clear();
 		switch(this.blockType){
@@ -880,8 +963,8 @@ class Block{
 	}
 	hitWithBall(_ball){
 		if(this.tough > 2 && _ball.attack < 2){ return; }
-		this.tough -= _ball.attack;
-		if(this.tough <= 0){ this.kill(); return; }
+		this.tough = max(0, this.tough - _ball.attack);
+		if(this.tough === 0){ this.kill(); return; }
 		// returnしないと実行されちゃうでしょこの馬鹿！！！！！！
 		this.drawBlockImage(); // killの後に描かないとエラーになる。当たり前。
 	}
@@ -1047,6 +1130,262 @@ class CircleCollider extends Collider{
 	constructor(){
 		super();
 		this.type = "circle";
+	}
+}
+
+// ----------------------------------------------------------------------------------- //
+// drawFunction.
+// particle描画用の関数
+
+function drawTriangle(x, y, radius, rotationAngle, shapeColor, gr){
+	// (x, y)を中心とする三角形、radiusは重心から頂点までの距離。
+	let p = [];
+	for(let i = 0; i < 3; i++){
+		p.push({x:x + radius * cos(rotationAngle + PI * i * 2 / 3), y:y + radius * sin(rotationAngle + PI * i * 2 / 3)});
+	}
+	gr.fill(shapeColor);
+	gr.triangle(p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y);
+}
+
+function drawSquare(x, y, radius, rotationAngle, shapeColor, gr){
+	// (x, y)を中心とする正方形、radiusは重心から頂点までの距離。
+	let p = [];
+	for(let i = 0; i < 4; i++){
+		p.push({x:x + radius * cos(rotationAngle + PI * i * 2 / 4), y:y + radius * sin(rotationAngle + PI * i * 2 / 4)});
+	}
+	gr.fill(shapeColor);
+	gr.quad(p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, p[3].x, p[3].y);
+}
+
+function drawStar(x, y, radius, rotationAngle, shapeColor, gr){
+	// (x, y)を中心としdirection方向にradius離れててstarColorで塗りつぶしてやる感じ
+	// radiusは外接円の半径
+	let p = [];
+	for(let i = 0; i < 5; i++){
+		p.push({x:x + radius * cos(rotationAngle + 2 * PI * i / 5), y:y + radius * sin(rotationAngle + 2 * PI * i / 5)});
+	}
+	const shortLength = radius * sin(PI / 10) / cos(PI / 5);
+	for(let i = 0; i < 5; i++){
+		p.push({x:x - shortLength * cos(rotationAngle + 2 * PI * i / 5), y:y - shortLength * sin(rotationAngle + 2 * PI * i / 5)});
+	}
+	gr.fill(shapeColor);
+	gr.triangle(p[1].x, p[1].y, p[8].x, p[8].y, p[9].x, p[9].y);
+	gr.triangle(p[4].x, p[4].y, p[6].x, p[6].y, p[7].x, p[7].y);
+	gr.quad(p[0].x, p[0].y, p[2].x, p[2].y, p[5].x, p[5].y, p[3].x, p[3].y);
+}
+
+function drawCross(x, y, radius, rotationAngle, shapeColor, gr){
+  // なんかquad4つのやつ
+	let p = [];
+	for(let i = 0; i < 4; i++){
+		p.push({x:x + radius * cos(rotationAngle + PI * i / 2), y:y + radius * sin(rotationAngle + PI * i / 2)});
+	}
+	for(let i = 0; i < 4; i++){
+		p.push({x:x + radius * 0.3 * cos(rotationAngle + PI * (i + 0.5) / 2), y:y + radius * 0.3 * sin(rotationAngle + PI * (i + 0.5) / 2)});
+	}
+	gr.fill(shapeColor);
+	gr.quad(x, y, p[4].x, p[4].y, p[0].x, p[0].y, p[7].x, p[7].y);
+	gr.quad(x, y, p[5].x, p[5].y, p[1].x, p[1].y, p[4].x, p[4].y);
+	gr.quad(x, y, p[6].x, p[6].y, p[2].x, p[2].y, p[5].x, p[5].y);
+	gr.quad(x, y, p[7].x, p[7].y, p[3].x, p[3].y, p[6].x, p[6].y);
+}
+
+
+// ----------------------------------------------------------------------------------- //
+// Particle and ParticleSystem.
+// ボールが消滅するときのエフェクト。
+
+class Particle{
+	constructor(x, y, particleHue){
+		this.center = {};
+	}
+	initialize(x, y, direction, baseColor, drawFunction, sizeFactor, hopFlag){
+		this.center.x = x;
+		this.center.y = y;
+		this.direction = direction; // 方向指定
+	  this.finalDistance = random(MIN_DISTANCE, MAX_DISTANCE);
+		this.life = PARTICLE_LIFE; // 寿命は固定しよう。
+		this.color = baseColor;
+		this.rotationAngle = random(2 * PI); // 回転の初期位相
+		this.radius = random(MIN_RADIUS, MAX_RADIUS) * sizeFactor; // 本体の半径. 6～24がデフォで、大きさをsizeFactorで調整する。
+		this.alive = true;
+		this.drawFunction = drawFunction;
+		this.hop = hopFlag;
+	}
+	update(){
+		this.life--;
+		this.rotationAngle += PARTICLE_ROTATION_SPEED;
+		if(this.life === 0){ this.alive = false; }
+	}
+	draw(gr){
+		let prg = (PARTICLE_LIFE - this.life) / PARTICLE_LIFE;
+		prg = sqrt(prg * (2 - prg));
+		//const particleColor = color(this.colorData.r, this.colorData.g, this.colorData.b, 255 * (1 - prg));
+		this.color.setAlpha(255 * (1 - prg));
+		let x = this.center.x + this.finalDistance * prg * cos(this.direction);
+		let y = this.center.y + this.finalDistance * prg * sin(this.direction);
+		if(this.hop){
+			// ぽ～ん効果
+			y -= prg * (1 - prg) * 4.0 * this.finalDistance * 0.5;
+		}
+    this.drawFunction(x, y, this.radius, this.rotationAngle, this.color, gr);
+	}
+	remove(){
+		if(this.alive){ return; }
+		this.belongingArray.remove(this);
+		particlePool.recycle(this);
+	}
+}
+
+// クリックするとその位置にパーティクルが出現するようにしたいのです。うん。
+// デモじゃないのでそれはありえません（ごめんね）
+class ParticleSystem{
+	constructor(){
+		this.particleArray = new CrossReferenceArray();
+		this.directionRange = [0, 2 * PI]; // ここをいじると色んな方向にとびだす
+		//this.lifeFactor = 1.0;
+		this.sizeFactor = 1.0;
+		this.hop = false; // particleが放物線を描くかどうか。デフォはまっすぐ。
+		this.gr = undefined; // 画像
+	}
+	isEmpty(){
+		// isEmptyかどうかで遷移すべきか否かの条件とする
+		return this.particleArray.isEmpty();
+	}
+	setGraphic(w, h){
+		// 画像のサイズを含めた初期化
+		this.gr = createGraphics(w, h);
+		this.gr.noStroke();
+	}
+	createParticle(x, y, baseColor, drawFunction, particleNum){
+		for(let i = 0; i < particleNum; i++){
+			let ptc = particlePool.use();
+			// 一応基本は[0, 2 * PI]で。特定方向に出す場合も考慮・・
+			const direction = random(this.directionRange[0], this.directionRange[1]);
+			ptc.initialize(x, y, direction, baseColor, drawFunction, this.sizeFactor, this.hop);
+			this.particleArray.add(ptc);
+		}
+	}
+	setDirectionRange(rangeArray){
+		this.directionRange = rangeArray;
+		return this;
+	}
+	setSizeFactor(sizeFactor){
+		this.sizeFactor = sizeFactor;
+		return this;
+	}
+	setHop(flag){
+		this.hop = flag;
+		return this;
+	}
+	update(){
+		this.particleArray.loop("update");
+	}
+	draw(gr){
+		// 特定のグラフィックに描画させたい
+		this.gr.clear();
+		this.particleArray.loop("draw", [this.gr]);
+		gr.image(this.gr, 0, 0);
+	}
+	remove(){
+		this.particleArray.loopReverse("remove");
+	}
+}
+
+// ----------------------------------------------------------------------------------- //
+// ObjectPool.
+// particleを出すためのプール
+
+class ObjectPool{
+	constructor(objectFactory = (() => ({})), initialCapacity = 0){
+		this.objPool = [];
+		this.nextFreeSlot = null; // 使えるオブジェクトの存在位置を示すインデックス
+		this.objectFactory = objectFactory;
+		this.grow(initialCapacity);
+	}
+	use(){
+		if(this.nextFreeSlot == null || this.nextFreeSlot == this.objPool.length){
+		  this.grow(this.objPool.length || 5); // 末尾にいるときは長さを伸ばす感じ。lengthが未定義の場合はとりあえず5.
+		}
+		let objToUse = this.objPool[this.nextFreeSlot]; // FreeSlotのところにあるオブジェクトを取得
+		this.objPool[this.nextFreeSlot++] = EMPTY_SLOT; // その場所はemptyを置いておく、そしてnextFreeSlotを一つ増やす。
+		return objToUse; // オブジェクトをゲットする
+	}
+	recycle(obj){
+		if(this.nextFreeSlot == null || this.nextFreeSlot == -1){
+			this.objPool[this.objPool.length] = obj; // 図らずも新しくオブジェクトが出来ちゃった場合は末尾にそれを追加
+		}else{
+			// 考えづらいけど、this.nextFreeSlotが0のときこれが実行されるとobjPool[-1]にobjが入る。
+			// そのあとでrecycleが発動してる間は常に末尾にオブジェクトが増え続けるからFreeSlotは-1のまま。
+			// そしてuseが発動した時にその-1にあったオブジェクトが使われてそこにはEMPTY_SLOTが設定される
+			this.objPool[--this.nextFreeSlot] = obj;
+		}
+	}
+	grow(count = this.objPool.length){ // 長さをcountにしてcount個のオブジェクトを追加する
+		if(count > 0 && this.nextFreeSlot == null){
+			this.nextFreeSlot = 0; // 初期状態なら0にする感じ
+		}
+		if(count > 0){
+			let curLen = this.objPool.length; // curLenはcurrent Lengthのこと
+			this.objPool.length += Number(count); // countがなんか変でも数にしてくれるからこうしてるみたい？"123"とか。
+			// こうするとかってにundefinedで伸ばされるらしい・・長さプロパティだけ増やされる。
+			// 基本的にはlengthはpushとか末尾代入（a[length]=obj）で自動的に増えるけどこうして勝手に増やすことも出来るのね。
+			for(let i = curLen; i < this.objPool.length; i++){
+				// add new obj to pool.
+				this.objPool[i] = this.objectFactory();
+			}
+			return this.objPool.length;
+		}
+	}
+	size(){
+		return this.objPool.length;
+	}
+}
+
+// ----------------------------------------------------------------------------------- //
+// particle.
+
+// ----------------------------------------------------------------------------------- //
+// CrossReferenceArray.
+// particleを格納するための配列。
+
+class CrossReferenceArray extends Array{
+	constructor(){
+    super();
+	}
+  add(element){
+    this.push(element);
+    element.belongingArray = this; // 所属配列への参照
+  }
+	isEmpty(){
+		// 空っぽかどうか
+		return this.length === 0;
+	}
+  remove(element){
+    let index = this.indexOf(element, 0);
+    this.splice(index, 1); // elementを配列から排除する
+  }
+  loop(methodName, args = undefined){
+		// argsは引数配列。指定しなければ普通に引数無しで実行される
+		if(this.length === 0){ return; }
+    // methodNameには"update"とか"display"が入る。まとめて行う処理。
+		for(let i = 0; i < this.length; i++){
+			if(args === undefined){
+			  this[i][methodName]();
+			}else{
+				this[i][methodName](...args);
+			}
+		}
+  }
+	loopReverse(methodName){
+		if(this.length === 0){ return; }
+    // 逆から行う。排除とかこうしないとエラーになる。もうこりごり。
+		for(let i = this.length - 1; i >= 0; i--){
+			this[i][methodName]();
+		}
+  }
+	clear(){
+		this.length = 0;
 	}
 }
 
