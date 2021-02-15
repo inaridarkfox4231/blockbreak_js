@@ -415,8 +415,7 @@ class Title extends State{
 		this.gr.textSize(80);
 		this.gr.text("BLOCKBREAK", 400, 80);
 		this.gr.textSize(40);
-		this.gr.text("PRESS ENTER KEY", 400, 170);
-		this.gr.text("(OR CLICK PLAY BUTTON)", 400, 220);
+		this.gr.text("----CLICK PLAY BUTTON----", 400, 200);
 		this.gr.image(this.levelSpace, 400 - 40 - 220, 320 - 20);
 		this.gr.image(this.modeSpace, 400 - 35 - 175, 420 - 20);
 		this.gr.image(this.playButton, 400 - 60, 520 - 15);
@@ -543,7 +542,7 @@ class Pause extends State{
 			this.setNextState("play");
 		}
 	}
-	clickAction(){} // マウスクリックイベント
+	clickAction(){}
 	update(){}
 	draw(){
 		image(this.gr, 0, 0);
@@ -567,14 +566,16 @@ class Gameover extends State{
 		this.gr.image(_state.gr, 0, 0);
 		this.gr.background(0, 128);
 		this.gr.text("GAME OVER...", CANVAS_W * 0.5, CANVAS_H * 0.46);
-		this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
+		this.gr.text("CLICK TO TITLE", CANVAS_W * 0.5, CANVAS_H * 0.54);
   }
   keyAction(code){
 		if(code === K_ENTER){
 			this.setNextState("title");
 		}
-	} // キーイベント
-	clickAction(){} // マウスクリックイベント
+	}
+	clickAction(){
+		this.setNextState("title");
+	}
 	update(){}
 	draw(){
 		image(this.gr, 0, 0);
@@ -599,10 +600,10 @@ class Clear extends State{
 		this.gr.background(0, 128);
 		if(this.allClearFlag){
 			this.gr.text("STAGE ALL CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
-			this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
+			this.gr.text("CLICK TO TITLE", CANVAS_W * 0.5, CANVAS_H * 0.54);
 		}else{
 			this.gr.text("STAGE CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
-			this.gr.text("PRESS ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
+			this.gr.text("CLICK TO NEXT STAGE", CANVAS_W * 0.5, CANVAS_H * 0.54);
 		}
 	}
   keyAction(code){
@@ -613,8 +614,14 @@ class Clear extends State{
 				this.setNextState("play");
 			}
 		}
-	} // キーイベント
-	clickAction(){} // マウスクリックイベント
+	}
+	clickAction(){
+		if(this.allClearFlag){
+			this.setNextState("title");
+		}else{
+			this.setNextState("play");
+		}
+	}
 	update(){}
 	draw(){
 		image(this.gr, 0, 0);
@@ -649,13 +656,39 @@ class GameSystem{
 		// const seed = stageData["level" + level]["stage" + stage];
 		this.level = level; // 描画用
 		this.stage = stage; // 描画用
+		// ボール
+		this.ball.initialize(); // ボールの初期化
+
+    /*
+		this.gr = createGraphics(540, 540);
+		this.gr.noStroke();
+		this.gr.colorMode(HSB, 100);
+		this.particles.setGraphic(540, 540);
+		this.blocks = [];
+		this.blocks.push(new Block(4, 13, 2, 1, NORMAL, 1));
+		this.blocks.push(new Block(6, 14, 2, 1, NORMAL, 2));
+		this.blocks.push(new Block(8, 15, 2, 1, NORMAL, 3));
+		this.blocks.push(new Block(5, 12, 2, 1, NORMAL, 1));
+		this.blocks.push(new Block(7, 13, 2, 1, NORMAL, 2));
+		this.blocks.push(new Block(9, 14, 2, 1, NORMAL, 3));
+		this.paddles = [];
+		const paddleLength = PADDLE_LENGTH[this.mode];
+
+		this.paddles.push(new ArcPaddle(270, 300, 210, paddleLength, 1));
+		// ガター
+		// , new RingCollider(270, 300, 55, 45) this.paddles.push(new ArcPaddle(270, 300, 60, paddleLength, 0));
+		const colliders = [new RingCollider(270, 300, 240, 220)];
+		this.gutter.setting(540, 540, colliders);
+		*/
+
+		// ここから
+
+
 		// グラフィック
 		this.gr = createGraphics(480, 440);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
 		this.particles.setGraphic(480, 440); // ここに毎フレーム描画する感じね
-		// ボール
-		this.ball.initialize(); // ボールの初期化
 		// ガター
 		const colliders = [new RectCollider(0, 420, 480, 20)];
 		this.gutter.setting(480, 440, colliders);
@@ -685,6 +718,9 @@ class GameSystem{
 		const paddleLength = PADDLE_LENGTH[this.mode];
 		this.paddles.push(new LinePaddle(20 + this.ball.radius * 1.95, 460 - paddleLength - this.ball.radius * 1.95,
 			                               416, 416, paddleLength, 4, -PI/2));
+
+		// ここまで
+
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
 		// クリアフラグのリセット
@@ -1018,6 +1054,7 @@ class Paddle{
 	removeBall(){
 		this.ball = undefined;
 	}
+	updateBall(){}
 	update(){
 		if(this.active){
 			this.activeCount--;
@@ -1025,6 +1062,14 @@ class Paddle{
 				this.inActivate();
 			}
 		}
+	}
+	drawPointer(gr){
+		if(this.ball === undefined){ return; }
+		gr.stroke(0, 0, 100);
+		gr.strokeWeight(2);
+		gr.line(this.ball.x, this.ball.y,
+						this.ball.x + 40 * cos(this.ball.direction), this.ball.y + 40 * sin(this.ball.direction));
+		gr.noStroke();
 	}
 }
 
@@ -1060,13 +1105,7 @@ class LinePaddle extends Paddle{
 	draw(gr){
 		if(this.active){ gr.fill(15, 100, 100); }else{ gr.fill(15, 0, 100); }
 		gr.rect(this.x, this.y, this.w, this.h);
-		if(this.ball !== undefined){
-		  gr.stroke(0, 0, 100);
-		  gr.strokeWeight(2);
-		  gr.line(this.ball.x, this.ball.y,
-				      this.ball.x + this.w * cos(this.ball.direction), this.ball.y + this.w * sin(this.ball.direction));
-			gr.noStroke();
-		}
+		this.drawPointer(gr);
 	}
 }
 
@@ -1081,23 +1120,44 @@ class ArcPaddle extends Paddle{
 		this.cy = cy;
 		this.r = r;
 		this.w = w;
+		// t1とt2は端っこの角度の値です
 		this.t1 = -w * 0.5 / r;
 		this.t2 = w * 0.5 / r;
 		this.directionFlag = directionFlag; // 内向きか外向きかって話. 0なら外向き、1なら内向き。これのPI倍を足せばいい。
 		this.direction = directionFlag * Math.PI;
 		// パドルなので4で固定ね
-		this.collider = new ArcCollider(this.cx, this.cy, this.r, 4, this.t1, this.t2);
+		this.collider = new ArcCollider(this.cx, this.cy, this.r, w);
 	}
 	move(mx, my){
 		// まず(0.5, 0.5)を中心とする方向を割り出す
 		const t = atan2(my - 0.5, mx - 0.5);
 		this.t1 = t - this.w * 0.5 / this.r;
 		this.t2 = t + this.w * 0.5 / this.r;
-		this.direction = t + directionFlag * Math.PI;
+		this.direction = t + this.directionFlag * Math.PI;
 		this.collider.update(this.t1, this.t2);
 	}
-	updateBall(){}
-	draw(gr){}
+	updateBall(){
+		if(this.ball === undefined){ return; }
+		// ボール保持中にボールのdirectionと位置をいじるやつ
+		const count = this.ball.getNonActiveFrameCount();
+		const n = 2 * (abs(60 - (count % 120)) - 30);
+		const ballDirection = this.direction + n * Math.PI / 180;
+		this.ball.setDirection(ballDirection);
+		const sgn = (this.directionFlag === 0 ? 1 : -1);
+		const cr = this.r + sgn * (this.ball.radius + 2);
+		// フラグ補正忘れずに
+		this.ball.setPos(this.cx + cr * Math.cos(this.direction + this.directionFlag * Math.PI),
+		                 this.cy + cr * Math.sin(this.direction + this.directionFlag * Math.PI));
+	}
+	draw(gr){
+		// t1からt2まで描画する
+		if(this.active){ gr.stroke(15, 100, 100); }else{ gr.stroke(15, 0, 100); }
+		gr.noFill();
+		gr.strokeWeight(4);
+		gr.arc(this.cx, this.cy, this.r * 2, this.r * 2, this.t1, this.t2);
+	  gr.noStroke();
+		this.drawPointer(gr);
+	}
 }
 
 // ----------------------------------------------------------------------------------- //
@@ -1221,12 +1281,23 @@ class Gutter{
 					this.gr.image(this.grLava, 0, 0);
 					this.gr.pop();
 					break;
+				case "ring":
+				  this.gr.push();
+					this.gr.circle(c.cx, c.cy, c.rmax * 2);
+					this.gr.drawingContext.clip();
+					this.gr.image(this.grLava, 0, 0);
+					this.gr.pop();
+					this.gr.erase();
+					this.gr.circle(c.cx, c.cy, c.rmin * 2);
+					this.gr.noErase();
+					break;
 			}
 		}
 	}
 	check(_ball){
 		// 当たり判定
-		for(let c of this.colliders){ if(c.collideWithBall(_ball)){ return true; } }
+		// optionをfalseにして速度を足さないようにする
+		for(let c of this.colliders){ if(c.collideWithBall(_ball, false)){ return true; } }
 		return false;
 	}
 	draw(gr){
@@ -1258,14 +1329,16 @@ class RectCollider extends Collider{
 		this.x = x;
 		this.y = y;
 	}
-	collideWithBall(_ball){
+	collideWithBall(_ball, post = true){
 		// 速度を足す。
+		// postは速度を足すかどうかって話。ガターでは足さないので。
 		const d = _ball.direction;
-		const postX = _ball.x + _ball.speed * cos(d);
-		const postY = _ball.y + _ball.speed * sin(d);
+		const coeff = (post ? 1 : 0);
+		const bx = _ball.x + coeff * _ball.speed * cos(d);
+		const by = _ball.y + coeff * _ball.speed * sin(d);
 		// ぶつかるかどうか調べてtrueかfalseを返すだけ。
-		if(this.x + this.w < postX - _ball.radius || postX + _ball.radius < this.x){ return false; }
-		if(this.y + this.h < postY - _ball.radius || postY + _ball.radius < this.y){ return false; }
+		if(this.x + this.w < bx - _ball.radius || bx + _ball.radius < this.x){ return false; }
+		if(this.y + this.h < by - _ball.radius || by + _ball.radius < this.y){ return false; }
 		return true;
 	}
 	reflect(_ball){
@@ -1288,48 +1361,70 @@ class RectCollider extends Collider{
 
 // 厚みが必要。バームクーヘン的な。パドル専用。厚みは4で固定・・んー。
 class ArcCollider extends Collider{
-  constructor(cx, cy, r, h, t1, t2){
+  constructor(cx, cy, r, w){
 		super();
 		this.type = "arc";
 		this.cx = cx;
 		this.cy = cy;
 		this.r = r;
-		this.h = h;
-		this.t1 = t1;
-		this.t2 = t2;
+    this.w = w;
+		this.h = 4; // 厚み
+		this.t1 = -w * 0.5 / r;
+		this.t2 = w * 0.5 / r;
 	}
 	update(t1, t2){
 		this.t1 = t1;
 		this.t2 = t2;
 	}
-	collideWithBall(_ball){
+	collideWithBall(_ball, post = true){
 		// 速度を足す。
 		const d = _ball.direction;
-		const postX = _ball.x + _ball.speed * cos(d);
-		const postY = _ball.y + _ball.speed * sin(d);
+		const coeff = (post ? 1 : 0);
+		const bx = _ball.x + coeff * _ball.speed * cos(d);
+		const by = _ball.y + coeff * _ball.speed * sin(d);
 		// ボールの中心の方向がt1-diff～t2+diffの範囲内にあるか調べる。
-		// diffはthis.h/2に相当する長さの角度のずれ、要するにthis.h / (2 * this.r)ね。
+		// diffはthis.l/2に相当する長さの角度のずれ、要するにthis.l / (2 * this.r)ね。
 		// あったとして、今度は中心からの距離を取り、this.rとの差が、絶対値が、厚さの半分と半径の和より大きいならfalse.
 		// 扇形はそれほど大きいものを想定していないので範囲内かどうかについてはcosの値で判定すればOK.
 		const diff = this.h / (2 * this.r);
-		const ballDir = atan2(_ball.y - this.cy, _ball.x - this.cx);
+		const ballDir = atan2(by - this.cy, bx - this.cx);
 		if(Math.cos(ballDir - diff - (this.t1 + this.t2) * 0.5) < Math.cos(diff + (this.t2 - this.t1) * 0.5)){ return false; }
-		const ballDistance = dist(_ball.x, _ball.y, this.cx, this.cy);
+		const ballDistance = dist(bx, by, this.cx, this.cy);
 		if(abs(ballDistance - this.r) > this.h * 0.5 + _ball.radius){ return false; }
 		return true;
 	}
 	reflect(_ball){
-		// 中心がdiffの内側なら普通に反射する感じ
-		// はじっこのときは然るべく反射する
-		// 外側か内側かで向きが変わるので注意
+		// 中心がdiffの内側なら普通に反射する感じ。
+		// はじっこはやめましょう。
+		// constrainしてなるべく中央側に出るようにしようかな（内積でぶつかる方向を割り出して）
+		const d = _ball.direction;
+		const postX = _ball.x + _ball.speed * cos(d);
+		const postY = _ball.y + _ball.speed * sin(d);
+		const diff = this.h / (2 * this.r);
+		const ballDir = atan2(postY - this.cy, postX - this.cx);
+		const ballDistance = dist(postX, postY, this.cx, this.cy);
+		// diffの内側なので反射. いずれにせよballDirを中心として反対側に。
+		let v = createVector(_ball.speed * Math.cos(d), _ball.speed * Math.sin(d));
+		let n = p5.Vector.fromAngle(ballDir);
+		let u = p5.Vector.sub(v, p5.Vector.mult(n, p5.Vector.dot(v, n) * 2)); // 2を掛けてたよ・・multの引数にしないとね。
+		_ball.setDirection(u.heading());
 	}
 }
 
 // 円環も用意するか。これはガター専用。処理が煩雑になるので分ける。
 class RingCollider extends Collider{
-	constructor(){
+	constructor(cx, cy, r1, r2){
 		super();
 		this.type = "ring";
+		this.cx = cx;
+		this.cy = cy;
+		this.rmin = min(r1, r2);
+		this.rmax = max(r1, r2);
+	}
+	collideWithBall(_ball){
+		const ballDistance = dist(_ball.x, _ball.y, this.cx, this.cy);
+		if(ballDistance - _ball.radius > this.rmax || ballDistance + _ball.radius < this.rmin){ return false; }
+		return true;
 	}
 }
 
