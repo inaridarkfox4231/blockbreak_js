@@ -690,7 +690,7 @@ class GameSystem{
 		this.gr.colorMode(HSB, 100);
 		this.particles.setGraphic(480, 440); // ここに毎フレーム描画する感じね
 		// ガター
-		const colliders = [new RectCollider(0, 420, 480, 20)];
+		const colliders = [new RectCollider(0, 420, 480, 20), new RectCollider(0, 60, 16, 380), new RectCollider(464, 60, 16, 380)];
 		this.gutter.setting(480, 440, colliders);
 		// ブロック
 		this.blocks = [];
@@ -868,12 +868,12 @@ class GameSystem{
 	draw(){
 		// 背景
 		this.gr.background(0);
-		// ガター
-		this.gutter.draw(this.gr);
 		// ブロック、パドル、ボール
 		for(let b of this.blocks){ b.draw(this.gr); }
 		for(let pdl of this.paddles){ pdl.draw(this.gr); }
 		if(this.ball.isAlive()){ this.ball.draw(this.gr); }
+		// ガター
+		this.gutter.draw(this.gr);
 		// パーティクルの描画
 		this.particles.draw(this.gr);
 		// コンフィグパート
