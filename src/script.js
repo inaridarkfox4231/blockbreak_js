@@ -672,7 +672,8 @@ class GameSystem{
 		// パドル
 		this.paddles = [];
 		const paddleLength = PADDLE_LENGTH[this.mode];
-		this.paddles.push(new LinePaddle(20, 460 - paddleLength, 416, 416, paddleLength, 4, -PI/2));
+		this.paddles.push(new LinePaddle(20 + this.ball.radius * 1.95, 460 - paddleLength - this.ball.radius * 1.95,
+			                               416, 416, paddleLength, 4, -PI/2));
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
 	}
@@ -1180,6 +1181,7 @@ class Gutter{
 	setting(w, h, colliders){
 		this.gr = createGraphics(w, h);
 		this.gr.noStroke();
+		this.gr.fill(0);
 		this.gr.colorMode(HSB, 100);
 		this.colliders = colliders;
 		this.grLava = createGraphics(w, h, WEBGL);
