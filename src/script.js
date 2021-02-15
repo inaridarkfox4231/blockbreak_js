@@ -171,22 +171,21 @@ let codes = [];
 let sound_death;
 let sound_wall;
 let sound_decision;
+let sound_powerup;
 
 // ----------------------------------------------------------------------------------- //
 // main.
 
 function preload(){
 	huiFont = loadFont("https://inaridarkfox4231.github.io/assets/HuiFont29.ttf");
-	codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_C.wav"));
-	codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_D.wav"));
-	codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_E.wav"));
-	codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_F.wav"));
-	codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_G.wav"));
-	codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_A.wav"));
-	codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_B.wav"));
+	const codeNames = ["C", "D", "E", "F", "G", "A", "B", "C2", "D2", "E2", "F2", "G2", "A2", "B2"];
+	for(let name of codeNames){
+		codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_" + name + ".wav"));
+	}
 	sound_death = loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/death.wav");
 	sound_wall = loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/wall.wav");
 	sound_decision = loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/decision.wav");
+	sound_powerup = loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/powerup.wav");
 }
 
 function setup() {
@@ -212,6 +211,7 @@ class Music{
 		this.deathSound = sound_death;
 		this.wallSound = sound_wall;
 		this.decisionSound = sound_decision;
+		this.powerupSound = sound_powerup;
 	}
 	playBlockSound(id){
 		this.codeSounds[id].play();
@@ -224,6 +224,9 @@ class Music{
 	}
 	playDecisionSound(){
 		this.decisionSound.play();
+	}
+	playPowerupSound(){
+		this.powerupSound.play();
 	}
 }
 
@@ -363,7 +366,13 @@ class Title extends State{
 		this.playButton.fill(0);
 		this.playButton.text("play", 60, 24);
 	}
-	prepare(_state){}
+	prepare(_state){
+		// いろいろリセットしないとダメ
+		this.level = 0;
+		this.mode = 0;
+		this.drawLevelButtons();
+		this.drawModeButtons();
+	}
   keyAction(code){
     // エンターキー押したら直接プレイへ飛ぶ
     if(code === K_ENTER){
@@ -632,6 +641,8 @@ class GameSystem{
 		// パーティクルシステム
 		// システム側に画像を持たせてそれを乗せるか。
 		this.particles = new ParticleSystem();
+		// クリア用フラグ（ノーマルを全滅させたところでボールの動きを止めたい）
+		this.clearFlag = false; // ノーマル全滅でtrueにする
 	}
 	setPattern(level, stage){
 		// levelとstageによりjsonからステージシードを引き出す：
@@ -639,19 +650,19 @@ class GameSystem{
 		this.level = level; // 描画用
 		this.stage = stage; // 描画用
 		// グラフィック
-		this.gr = createGraphics(480, 448);
+		this.gr = createGraphics(480, 440);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
-		this.particles.setGraphic(480, 448); // ここに毎フレーム描画する感じね
+		this.particles.setGraphic(480, 440); // ここに毎フレーム描画する感じね
 		// ボール
 		this.ball.initialize(); // ボールの初期化
 		// ガター
-		const colliders = [new RectCollider(20, 428, 440, 20)];
-		this.gutter.setting(480, 460, colliders);
+		const colliders = [new RectCollider(0, 420, 480, 20)];
+		this.gutter.setting(480, 440, colliders);
 		// ブロック
 		this.blocks = [];
-		this.blocks.push(new Block(0, 3, 1, 20));
-		this.blocks.push(new Block(23, 3, 1, 20));
+		this.blocks.push(new Block(0, 3, 1, 18));
+		this.blocks.push(new Block(23, 3, 1, 18));
 		this.blocks.push(new Block(1, 3, 22, 1));
 		this.blocks.push(new Block(6, 7, 2, 1, NORMAL, 1, 65));
 		this.blocks.push(new Block(6, 9, 2, 1, NORMAL, 1, 65));
@@ -676,6 +687,8 @@ class GameSystem{
 			                               416, 416, paddleLength, 4, -PI/2));
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
+		// クリアフラグのリセット
+		this.clearFlag = false;
 	}
 	initialize(mode){
 		// レベルの最初に行なう処理。スコアのリセットとライフ設定
@@ -715,10 +728,10 @@ class GameSystem{
 			  myMusic.playWallSound();
 				break;
 			case NORMAL:
-			  myMusic.playBlockSound(b.getId());
+			  myMusic.playBlockSound(b.getId() + 7 * this.ball.level);
 				break;
 			case LIFEUP:
-			  myMusic.playBlockSound(5);
+			  myMusic.playBlockSound(5 + 7 * this.ball.level);
 				break;
 		}
 	}
@@ -776,6 +789,12 @@ class GameSystem{
 			this.collideWithBlocks();
 			this.collideWithPaddles();
 	  }
+		// ここでフラグをチェック
+		this.clearFlag = true;
+		for(let b of this.blocks){
+			if(b.blockType === NORMAL){ this.clearFlag = false; break; }
+		}
+		if(this.clearFlag){ return; } // クリア条件を満たしたら以降の処理はキャンセル
 		this.ball.update();
 		if(this.ball.isActive()){
 			if(this.gutter.check(this.ball)){
@@ -803,10 +822,12 @@ class GameSystem{
 	clearCheck(){
 		// パーティクルが残ってたら移動しないようにする・・
 		if(!this.particles.isEmpty()){ return false; }
+		/*
 		for(let b of this.blocks){
 			if(b.blockType === NORMAL){ return false; }
 		}
-		return true;
+		*/
+		return this.clearFlag;
 	}
 	draw(){
 		// 背景
@@ -915,6 +936,7 @@ class Ball{
 		if(this.level === 1){ return; }
 		this.level++;
 		this.poweredCount = 240;
+		myMusic.playPowerupSound();
 		this.setStatus();
 	}
 	initialize(){
