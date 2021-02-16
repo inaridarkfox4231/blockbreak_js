@@ -1,0 +1,25 @@
+円とかはこっちに避難ね
+/*
+		this.gr = createGraphics(540, 540);
+		this.gr.noStroke();
+		this.gr.colorMode(HSB, 100);
+		this.particles.setGraphic(540, 540);
+		this.blocks = [];
+		this.blocks.push(new Block(4, 13, 2, 1, NORMAL, 1));
+		this.blocks.push(new Block(6, 14, 2, 1, NORMAL, 2));
+		this.blocks.push(new Block(8, 15, 2, 1, NORMAL, 3));
+		this.blocks.push(new Block(5, 12, 2, 1, NORMAL, 1));
+		this.blocks.push(new Block(7, 13, 2, 1, NORMAL, 2));
+		this.blocks.push(new Block(9, 14, 2, 1, NORMAL, 3));
+		this.ringWalls = [];
+		this.ringWalls.push(new RingWall(270, 240, 30, 36));
+		this.paddles = [];
+		const paddleLength = PADDLE_LENGTH[this.mode];
+
+		this.paddles.push(new ArcPaddle(270, 300, 210, paddleLength, 1));
+		// ガター
+		// , new RingCollider(270, 300, 55, 45) this.paddles.push(new ArcPaddle(270, 300, 60, paddleLength, 0));
+		const colliders = [new RingCollider(270, 300, 240, 220)];
+		this.gutter.setting(540, 540, colliders);
+
+*/

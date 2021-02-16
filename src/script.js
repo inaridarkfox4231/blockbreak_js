@@ -595,6 +595,7 @@ class Play extends State{
 		this.preAnimationSpan = 60; // 0になるまでいろいろキャンセルしてステージ番号を表示
   }
   keyAction(code){
+		if(this.preAnimationSpan > 0){ return; } // プレアニメ中はポーズ禁止
 		// シフトキーでボールの位置が変わるかも
 		// スペースキーでポーズ
 		if(code === K_SPACE){
@@ -602,6 +603,7 @@ class Play extends State{
 		}
 	}
 	clickAction(){
+		if(this.preAnimationSpan > 0){ return; } // プレアニメ中はクリック禁止
 		this.gameSystem.clickAction();
 	}
 	update(){
@@ -773,6 +775,25 @@ class GameSystem{
 		// クリア用フラグ（ノーマルを全滅させたところでボールの動きを止めたい）
 		this.clearFlag = false; // ノーマル全滅でtrueにする
 	}
+  stageSetup(w, h){
+		// ステージ作りで最初にやる処理
+		this.gr = createGraphics(w, h);
+		this.gr.noStroke();
+		this.gr.colorMode(HSB, 100);
+		this.particles.setGraphic(w, h);
+		this.blocks = [];
+		this.paddles = [];
+	}
+	setBlock(gridX, gridY, gridW, gridH, _type = WALL, tough = Infinity){
+		// ブロック設置用の簡易メソッド
+		this.blocks.push(new Block(gridX, gridY, gridW, gridH, _type, tough));
+	}
+	setBlockGroup(xArray, yArray, wArray, hArray, _type = WALL, tough = Infinity){
+		// まとめて
+		for(let i = 0; i < xArray.length; i++){
+			this.blocks.push(new Block(xArray[i], yArray[i], wArray[i], hArray[i], _type, tough));
+		}
+	}
 	setPattern(level, stage){
 		// levelとstageによりjsonからステージシードを引き出す：
 		// const seed = stageData["level" + level]["stage" + stage];
@@ -780,70 +801,10 @@ class GameSystem{
 		this.stage = stage; // 描画用
 		// ボール
 		this.ball.initialize(); // ボールの初期化
-
-		this.gr = createGraphics(540, 540);
-		this.gr.noStroke();
-		this.gr.colorMode(HSB, 100);
-		this.particles.setGraphic(540, 540);
-		this.blocks = [];
-		this.blocks.push(new Block(4, 13, 2, 1, NORMAL, 1));
-		this.blocks.push(new Block(6, 14, 2, 1, NORMAL, 2));
-		this.blocks.push(new Block(8, 15, 2, 1, NORMAL, 3));
-		this.blocks.push(new Block(5, 12, 2, 1, NORMAL, 1));
-		this.blocks.push(new Block(7, 13, 2, 1, NORMAL, 2));
-		this.blocks.push(new Block(9, 14, 2, 1, NORMAL, 3));
-		this.ringWalls = [];
-		this.ringWalls.push(new RingWall(270, 240, 30, 36));
-		this.paddles = [];
-		const paddleLength = PADDLE_LENGTH[this.mode];
-
-		this.paddles.push(new ArcPaddle(270, 300, 210, paddleLength, 1));
-		// ガター
-		// , new RingCollider(270, 300, 55, 45) this.paddles.push(new ArcPaddle(270, 300, 60, paddleLength, 0));
-		const colliders = [new RingCollider(270, 300, 240, 220)];
-		this.gutter.setting(540, 540, colliders);
-
-
-		// ここから
-
-/*
-		// グラフィック
-		this.gr = createGraphics(480, 440);
-		this.gr.noStroke();
-		this.gr.colorMode(HSB, 100);
-		this.particles.setGraphic(480, 440); // ここに毎フレーム描画する感じね
-		// ガター
-		const colliders = [new RectCollider(0, 420, 480, 20), new RectCollider(0, 60, 16, 380), new RectCollider(464, 60, 16, 380)];
-		this.gutter.setting(480, 440, colliders);
-		// ブロック
-		this.blocks = [];
-		this.blocks.push(new Block(0.8, 3, 0.2, 18));
-		this.blocks.push(new Block(23, 3, 0.2, 18));
-		this.blocks.push(new Block(1, 3, 22, 1));
-		this.blocks.push(new Block(6, 7, 2, 1, NORMAL, 1, 65));
-		this.blocks.push(new Block(6, 9, 2, 1, NORMAL, 1, 65));
-		this.blocks.push(new Block(6, 11, 2, 1, NORMAL, 1, 65));
-		this.blocks.push(new Block(8, 7, 2, 1, NORMAL, 2, 77));
-		this.blocks.push(new Block(8, 9, 2, 1, NORMAL, 2, 77));
-		this.blocks.push(new Block(8, 11, 2, 1, NORMAL, 2, 77));
-		this.blocks.push(new Block(10, 7, 2, 1, NORMAL, 3, 5));
-		this.blocks.push(new Block(10, 9, 2, 1, NORMAL, 3, 5));
-		this.blocks.push(new Block(10, 11, 2, 1, NORMAL, 3, 5));
-		this.blocks.push(new Block(12, 7, 2, 1, NORMAL, 4, 5));
-		this.blocks.push(new Block(12, 9, 2, 1, NORMAL, 4, 5));
-		this.blocks.push(new Block(12, 11, 2, 1, NORMAL, 4, 5));
-		this.blocks.push(new Block(14, 7, 2, 1, NORMAL, 5, 5));
-		this.blocks.push(new Block(14, 9, 2, 1, NORMAL, 5, 5));
-		this.blocks.push(new Block(14, 11, 2, 1, NORMAL, 5, 5));
-		this.blocks.push(new Block(13, 5, 2, 1, LIFEUP, 1));
-		// パドル
-		this.paddles = [];
-		const paddleLength = PADDLE_LENGTH[this.mode];
-		this.paddles.push(new LinePaddle(20 + this.ball.radius * 1.95, 460 - paddleLength - this.ball.radius * 1.95,
-			                               416, 416, paddleLength, 4, -PI/2));
-
-		// ここまで
-*/
+		// パターンを用意する
+		createStagePattern0();
+		window["createBlockPattern" + stage]();
+    // ボールをパドルにセットする
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
 		// クリアフラグのリセット
@@ -1023,6 +984,97 @@ class GameSystem{
 			this.gr.circle(cx, cy, 25);
 		}
 	}
+}
+
+// ----------------------------------------------------------------------------------- //
+// pattern.
+// ステージパターン（量産型の）。
+// 具体的にはガター、パドル、WALL型ブロックの一部とringWallの指定を行なう。
+// それ以外の部分は個別に用意する感じね。予定では0～24は円形パドルは出さないつもり。
+
+// オーソドックスなパドルが1つのステージ
+// ガターは両サイド2つと下にひとつ
+// パドルは下に一つで普通に左右に動くだけ
+// 480x440だけどサイズ的には480x380. 両サイドにガターとブロックで20x380の底面に480x20.その上にパドル1つ。
+// ブロックはその上の(20,60)～(460,420)でグリッド的には(1,3)～(23,21)です。
+function createStagePattern0(){
+	let sys = mySystem.state.play.gameSystem;
+	// setup
+	sys.stageSetup(480, 440);
+	// ガター
+	const colliders = [new RectCollider(0, 420, 480, 20), new RectCollider(0, 60, 16, 380), new RectCollider(464, 60, 16, 380)];
+	sys.gutter.setting(480, 440, colliders);
+	// ブロック
+	sys.blocks.push(new Block(0.8, 3, 0.2, 18));
+	sys.blocks.push(new Block(23, 3, 0.2, 18));
+	sys.blocks.push(new Block(1, 3, 22, 1));
+	// パドル
+	const paddleLength = PADDLE_LENGTH[sys.mode];
+	sys.paddles.push(new LinePaddle(20, 460 - paddleLength, 416, 416, paddleLength, 4, -PI/2));
+}
+
+// 1-1.
+function createBlockPattern0(){
+	let sys = mySystem.state.play.gameSystem;
+	for(let x = 6; x <= 16; x += 2){
+		for(let y = 7; y <= 8; y++){
+			sys.setBlock(x, y, 2, 1, NORMAL, 1);
+		}
+	}
+	for(let x = 6; x <= 16; x += 2){
+		for(let y = 12; y <= 13; y++){
+			sys.setBlock(x, y, 2, 1, NORMAL, 2);
+		}
+	}
+}
+
+// 1-2.
+function createBlockPattern1(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([11, 9, 11, 13, 7, 9, 13, 15], [5, 6, 6, 6, 7, 7, 7, 7],
+		                [2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
+	sys.setBlockGroup([7, 9, 13, 15, 5, 7, 15, 17], [9, 9, 9, 9, 10, 10, 10, 10],
+		                [2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 2);
+	sys.setBlockGroup([5, 7, 15, 17, 3, 5, 17, 19], [12, 12, 12, 12, 13, 13, 13, 13],
+		                [2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 3);
+}
+
+// 1-3.
+function createBlockPattern2(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21], [9, 8, 7, 6, 5, 4, 5, 6, 7, 8, 9],
+		                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
+	sys.setBlockGroup([3, 5, 7, 9, 11, 13, 15, 17, 19], [10, 9, 8, 7, 6, 7, 8, 9, 10],
+		                [2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 2);
+	sys.setBlockGroup([5, 7, 9, 11, 13, 15, 17], [11, 10, 9, 8, 9, 10, 11],
+		                [2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1], NORMAL, 3);
+	sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
+}
+
+// 1-4.
+function createBlockPattern3(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlock(11, 4, 2, 1, LIFEUP, 1);
+	sys.setBlockGroup([7, 15], [6, 6], [2, 2], [1, 1], NORMAL, 1);
+	for(let x = 9; x <= 13; x += 2){for(let y = 5; y <= 7; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
+	sys.setBlockGroup([5, 17], [7, 7], [2, 2], [1, 1], NORMAL, 2);
+	for(let x = 1; x <= 7; x += 2){for(let y = 8; y <= 9; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 2); }}
+	for(let x = 15; x <= 21; x += 2){for(let y = 8; y <= 9; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 2); }}
+	for(let x = 1; x <= 7; x += 2){for(let y = 12; y <= 13; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
+	for(let x = 15; x <= 21; x += 2){for(let y = 12; y <= 13; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
+}
+
+// 1-5.
+function createBlockPattern4(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
+	for(let x = 3; x <= 7; x += 2){for(let y = 5; y <= 6; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
+	for(let x = 15; x <= 19; x += 2){for(let y = 5; y <= 6; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
+	for(let x = 9; x <= 13; x += 2){for(let y = 9; y <= 10; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 2); }}
+	for(let x = 1; x <= 5; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
+	for(let x = 17; x <= 21; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
+	sys.setBlockGroup([7, 9, 11, 13, 15], [12, 13, 13, 13, 12], [2, 2, 2, 2, 2], [1, 1, 1, 1, 1], NORMAL, 4);
+	sys.setBlockGroup([3, 5, 11, 11, 17, 19], [8, 8, 6, 7, 8, 8], [2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1], NORMAL, 5);
 }
 
 // ----------------------------------------------------------------------------------- //
