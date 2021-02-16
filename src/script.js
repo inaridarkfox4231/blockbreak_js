@@ -761,6 +761,7 @@ class GameSystem{
 		this.mode = 0;
 		this.gutter = new Gutter(); // ガター
 		this.blocks = []; // ブロック
+		this.ringWalls = []; // リング状の反射目的のオブジェクト
 		this.paddles = []; // パドル
 		this.ball = new Ball(); // ボール
 		this.currentPaddleId = -1; // ボールが属するパドルのid. シフトキーで移動させるのに使う可能性がある
@@ -780,7 +781,6 @@ class GameSystem{
 		// ボール
 		this.ball.initialize(); // ボールの初期化
 
-    /*
 		this.gr = createGraphics(540, 540);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
@@ -792,6 +792,8 @@ class GameSystem{
 		this.blocks.push(new Block(5, 12, 2, 1, NORMAL, 1));
 		this.blocks.push(new Block(7, 13, 2, 1, NORMAL, 2));
 		this.blocks.push(new Block(9, 14, 2, 1, NORMAL, 3));
+		this.ringWalls = [];
+		this.ringWalls.push(new RingWall(270, 240, 30, 36));
 		this.paddles = [];
 		const paddleLength = PADDLE_LENGTH[this.mode];
 
@@ -800,11 +802,11 @@ class GameSystem{
 		// , new RingCollider(270, 300, 55, 45) this.paddles.push(new ArcPaddle(270, 300, 60, paddleLength, 0));
 		const colliders = [new RingCollider(270, 300, 240, 220)];
 		this.gutter.setting(540, 540, colliders);
-		*/
+
 
 		// ここから
 
-
+/*
 		// グラフィック
 		this.gr = createGraphics(480, 440);
 		this.gr.noStroke();
@@ -815,8 +817,8 @@ class GameSystem{
 		this.gutter.setting(480, 440, colliders);
 		// ブロック
 		this.blocks = [];
-		this.blocks.push(new Block(0, 3, 1, 18));
-		this.blocks.push(new Block(23, 3, 1, 18));
+		this.blocks.push(new Block(0.8, 3, 0.2, 18));
+		this.blocks.push(new Block(23, 3, 0.2, 18));
 		this.blocks.push(new Block(1, 3, 22, 1));
 		this.blocks.push(new Block(6, 7, 2, 1, NORMAL, 1, 65));
 		this.blocks.push(new Block(6, 9, 2, 1, NORMAL, 1, 65));
@@ -841,7 +843,7 @@ class GameSystem{
 			                               416, 416, paddleLength, 4, -PI/2));
 
 		// ここまで
-
+*/
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
 		// クリアフラグのリセット
@@ -867,6 +869,7 @@ class GameSystem{
 		}
 	}
 	getCollidePoint(){
+		// パーティクルの出現場所を計算する
 		return {x:this.ball.x + this.ball.radius * Math.cos(this.ball.direction),
 			      y:this.ball.y + this.ball.radius * Math.sin(this.ball.direction)};
 	}
@@ -879,13 +882,13 @@ class GameSystem{
 		// のちに円形ブロック使うようになったらまた変わるかもだけどね。円形には当たると強制アクティベートの付加効果を持たせるつもり
 		this.particles.createParticle(p.x, p.y, color(BREAK_PALETTE[id]), drawStar, particleNum);
 	}
-	createBlockSound(b){
-		switch(b.blockType){
+	createBlockSound(_type, id = 0){
+		switch(_type){
 			case WALL:
 			  myMusic.playWallSound();
 				break;
 			case NORMAL:
-			  myMusic.playBlockSound(b.getId() + 7 * this.ball.level);
+			  myMusic.playBlockSound(id + 7 * this.ball.level);
 				break;
 			case LIFEUP:
 			  myMusic.playBlockSound(5 + 7 * this.ball.level);
@@ -903,8 +906,8 @@ class GameSystem{
 				// ボール側
 				this.createBallParticle(p, drawCross, 5);
 				// ブロック側は壊れるかどうかで場合分け。壊れないなら5個しか出さない方向で。
-				this.createBlockSound(b);
 				const id = b.getId();
+				this.createBlockSound(b.blockType, id);
 				b.hitWithBall(this.ball);
 				if(b.isAlive()){
 					this.createBlockParticle(p, id, 5);
@@ -912,10 +915,21 @@ class GameSystem{
 					this.createBlockParticle(p, id, 20);
 				}
 				this.ball.hitWithBlock(b);
-				b.collider.reflect(this.ball);
+				b.collider.reflect(this.ball); // ここで反射処理
 				break;
 			}
 		}
+		// RingWall判定を置くとすればここ。
+		for(let ring of this.ringWalls){
+			if(ring.collider.collideWithBall(this.ball)){
+				const p = this.getCollidePoint();
+				this.createBallParticle(p, drawCross, 5);
+				this.createBlockSound(WALL);
+				ring.collider.reflect(this.ball);
+				break;
+			}
+		}
+		// 壊したブロックがあればそれを排除する処理
 		let id = -1;
 		for(let i = 0; i < this.blocks.length; i++){
 			if(!this.blocks[i].isAlive()){ id = i; break; }
@@ -943,8 +957,8 @@ class GameSystem{
 		const my = constrain((mouseY - offSet.y) / this.gr.height, 0, 1);
 		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); pdl.update(); }
 		if(this.ball.isActive()){
-			this.collideWithBlocks();
 			this.collideWithPaddles();
+			this.collideWithBlocks();
 	  }
 		// ここでフラグをチェック
 		this.clearFlag = true;
@@ -991,6 +1005,7 @@ class GameSystem{
 		this.gr.background(0);
 		// ブロック、パドル、ボール
 		for(let b of this.blocks){ b.draw(this.gr); }
+		for(let ring of this.ringWalls){ ring.draw(this.gr); }
 		for(let pdl of this.paddles){ pdl.draw(this.gr); }
 		if(this.ball.isAlive()){ this.ball.draw(this.gr); }
 		// ガター
@@ -1300,9 +1315,6 @@ class Block{
 		this.gr = createGraphics(this.w, this.h);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
-		this.gr.textSize(22);
-		this.gr.textAlign(CENTER, CENTER);
-		this.gr.textFont(huiFont);
 		this.drawBlockImage();
 	}
 	getId(){
@@ -1320,15 +1332,13 @@ class Block{
 		this.gr.clear();
 		switch(this.blockType){
 			case NORMAL:
-			  Block.normalDraw(this.gr, this.w, this.h, 0.15, BLOCK_HUE[this.tough - 1]);
+			  Block.normalDraw(this.gr, this.w, this.h, BLOCK_HUE[this.tough - 1]);
 				break;
 			case LIFEUP:
-			  Block.normalDraw(this.gr, this.w, this.h, 0.15, 88);
-				this.gr.fill(0);
-				this.gr.text("L", this.w * 0.5, this.h * 0.35);
+			  Block.normalDraw(this.gr, this.w, this.h, 88);
 				break;
 			case WALL:
-			  Block.wallDraw(this.gr, this.w, this.h, 0.3);
+			  Block.wallDraw(this.gr, this.w, this.h);
 				break;
 		}
 	}
@@ -1348,24 +1358,46 @@ class Block{
 	draw(gr){
 		gr.image(this.gr, this.x, this.y);
 	}
-	static normalDraw(gr, w, h, ratio, hue){
-		const diff = ratio * GRIDSIZE;
+	static normalDraw(gr, w, h, hue){
 		gr.fill(hue, 50, 100);
 		gr.rect(0, 0, w, h);
 		gr.fill(hue, 100, 50);
-		gr.rect(diff, diff, w - diff, h - diff);
+		gr.rect(1, 1, w - 1, h - 1);
 		gr.fill(hue, 100, 100);
-		gr.rect(diff, diff, w - diff * 2, h - diff * 2);
+		gr.rect(1, 1, w - 2, h - 2);
 	}
-	static wallDraw(gr, w, h, ratio){
+	static wallDraw(gr, w, h){
 		gr.clear();
-		const diff = ratio * GRIDSIZE;
 		gr.fill(75);
 		gr.rect(0, 0, w, h);
 		gr.fill(25);
-		gr.rect(diff, diff, w - diff, h - diff);
+		gr.rect(1, 1, w - 1, h - 1);
 		gr.fill(50);
-		gr.rect(diff, diff, w - diff * 2, h - diff * 2);
+		gr.rect(1, 1, w - 2, h - 2);
+	}
+}
+
+// RingWallはもう別に用意した方がいいと思う。で、当たり判定はブロックと一緒に用意する。
+class RingWall{
+	constructor(cx, cy, r1, r2){
+		this.cx = cx;
+		this.cy = cy;
+		this.rmin = min(r1, r2);
+		this.rmax = max(r1, r2);
+		this.gr = createGraphics(this.rmax * 2, this.rmax * 2);
+		this.collider = new RingCollider(cx, cy, r1, r2);
+		this.ringDraw();
+	}
+	ringDraw(){
+		this.gr.noStroke();
+		this.gr.fill(128);
+		this.gr.circle(this.rmax, this.rmax, this.rmax * 2);
+		this.gr.erase();
+		this.gr.circle(this.rmax, this.rmax, this.rmin * 2);
+		this.gr.noErase();
+	}
+	draw(gr){
+		gr.image(this.gr, this.cx - this.rmax, this.cy - this.rmax);
 	}
 }
 
@@ -1464,18 +1496,19 @@ class RectCollider extends Collider{
 	}
 	reflect(_ball){
 		// ぶつかる場合に速度を変える
+		// 使うのは速度を足す前の位置ですね（python版そうなってる）
 		const d = _ball.direction;
-		const postX = _ball.x + _ball.speed * cos(d);
-		const postY = _ball.y + _ball.speed * sin(d);
+		const bx = _ball.x;
+		const by = _ball.y;
 		const cx = this.x + this.w * 0.5;
 		const cy = this.y + this.h * 0.5;
-		if(abs(postX - cx) < this.w * 0.5){ _ball.setDirection(-d); return; }
-		if(abs(postY - cy) < this.h * 0.5){ _ball.setDirection(Math.PI - d); return; }
+		if(abs(bx - cx) < this.w * 0.5){ _ball.setDirection(-d); return; }
+		if(abs(by - cy) < this.h * 0.5){ _ball.setDirection(Math.PI - d); return; }
 		let mainDirection;
-		if(postX > cx && postY > cy){ mainDirection = Math.PI / 4; }
-		if(postX < cx && postY > cy){ mainDirection = Math.PI * 3 / 4; }
-		if(postX < cx && postY < cy){ mainDirection = Math.PI * 5 / 4; }
-		if(postX > cx && postY < cy){ mainDirection = Math.PI * 7 / 4; }
+		if(bx > cx && by > cy){ mainDirection = Math.PI / 4; }
+		if(bx < cx && by > cy){ mainDirection = Math.PI * 3 / 4; }
+		if(bx < cx && by < cy){ mainDirection = Math.PI * 5 / 4; }
+		if(bx > cx && by < cy){ mainDirection = Math.PI * 7 / 4; }
 		_ball.setDirection(mainDirection + (Math.random() * 2 - 1) * Math.PI / 12);
 	}
 }
@@ -1519,15 +1552,15 @@ class ArcCollider extends Collider{
 		// はじっこはやめましょう。
 		// constrainしてなるべく中央側に出るようにしようかな（内積でぶつかる方向を割り出して）
 		const d = _ball.direction;
-		const postX = _ball.x + _ball.speed * cos(d);
-		const postY = _ball.y + _ball.speed * sin(d);
+		const bx = _ball.x;
+		const by = _ball.y;
 		const diff = this.h / (2 * this.r);
-		const ballDir = atan2(postY - this.cy, postX - this.cx);
-		const ballDistance = dist(postX, postY, this.cx, this.cy);
+		const ballDir = atan2(by - this.cy, bx - this.cx);
+		//const ballDistance = dist(bx, by, this.cx, this.cy); // 使ってない
 		// diffの内側なので反射. いずれにせよballDirを中心として反対側に。
 		let v = createVector(_ball.speed * Math.cos(d), _ball.speed * Math.sin(d));
 		let n = p5.Vector.fromAngle(ballDir);
-		let u = p5.Vector.sub(v, p5.Vector.mult(n, p5.Vector.dot(v, n) * 2)); // 2を掛けてたよ・・multの引数にしないとね。
+		let u = p5.Vector.sub(v, p5.Vector.mult(n, 2 * p5.Vector.dot(v, n))); // 2を掛けてたよ・・multの引数にしないとね。
 		_ball.setDirection(u.heading());
 	}
 }
@@ -1546,6 +1579,17 @@ class RingCollider extends Collider{
 		const ballDistance = dist(_ball.x, _ball.y, this.cx, this.cy);
 		if(ballDistance - _ball.radius > this.rmax || ballDistance + _ball.radius < this.rmin){ return false; }
 		return true;
+	}
+	reflect(_ball){
+		// RingWallを作りたいので。これもよろしく～基本的にはパドルと一緒ですね。
+		const d = _ball.direction;
+		const bx = _ball.x;
+		const by = _ball.y;
+		const ballDir = atan2(by - this.cy, bx - this.cx);
+		let v = createVector(_ball.speed * Math.cos(d), _ball.speed * Math.sin(d));
+		let n = p5.Vector.fromAngle(ballDir);
+		let u = p5.Vector.sub(v, p5.Vector.mult(n, 2 * p5.Vector.dot(v, n)));
+		_ball.setDirection(u.heading());
 	}
 }
 
