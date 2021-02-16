@@ -1026,6 +1026,7 @@ function createBlockPattern0(){
 			sys.setBlock(x, y, 2, 1, NORMAL, 2);
 		}
 	}
+	sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
 }
 
 // 1-2.
@@ -1388,6 +1389,8 @@ class Block{
 				break;
 			case LIFEUP:
 			  Block.normalDraw(this.gr, this.w, this.h, 88);
+				// ハートマーク描こうね
+				Block.drawHeart(this.gr, this.w * 0.5, this.h * 0.55);
 				break;
 			case WALL:
 			  Block.wallDraw(this.gr, this.w, this.h);
@@ -1426,6 +1429,16 @@ class Block{
 		gr.rect(1, 1, w - 1, h - 1);
 		gr.fill(50);
 		gr.rect(1, 1, w - 2, h - 2);
+	}
+	static drawHeart(gr, cx, cy){
+		gr.stroke(88, 20, 100);
+		gr.strokeWeight(8);
+		gr.line(cx, cy, cx - 4, cy - 4);
+		gr.line(cx, cy, cx + 4, cy - 4);
+		gr.noStroke();
+		gr.fill(88, 20, 100);
+		let l = 4 * Math.sqrt(2);
+		gr.quad(cx, cy - l, cx + l, cy, cx, cy + l, cx - l, cy);
 	}
 }
 
