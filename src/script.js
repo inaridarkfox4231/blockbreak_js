@@ -803,7 +803,7 @@ class GameSystem{
 		this.ball.initialize(); // ボールの初期化
 		// パターンを用意する
 		createStagePattern0();
-		window["createBlockPattern" + 12]();
+		window["createBlockPattern" + 19]();
     // ボールをパドルにセットする
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
@@ -1223,6 +1223,110 @@ function createBlockPattern12(){
 // 3-4.
 function createBlockPattern13(){
 	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([7, 5], [7, 9], [2, 2], [1, 1], LIFEUP, 1);
+	sys.setBlockGroup([1, 1], [13, 15], [2, 2], [2, 2], NORMAL, 2);
+	for(let x = 4; x <= 20; x += 2){sys.setBlock(x, 5, 2, 1, NORMAL, 1); }
+	for(let y = 6; y <= 10; y += 2){sys.setBlock(21, y, 1, 2, NORMAL, 2); }
+  sys.setBlockGroup([2, 5, 7, 20], [5, 7, 8, 14], [2, 2, 2, 2], [2, 2, 2, 2], NORMAL, 3);
+  sys.setBlockGroup([2, 2, 2, 21], [7, 9, 11, 12], [1, 1, 1, 1], [2, 2, 2, 2], NORMAL, 3);
+	for(let x = 8; x <= 18; x += 2){sys.setBlock(x, 15, 2, 1, NORMAL, 3); }
+  sys.setBlockGroup([15, 14], [8, 10], [1, 2], [2, 2], NORMAL, 4);
+	for(let x = 4; x <= 12; x += 2){sys.setBlock(x, 11, 2, 1, NORMAL, 4); }
+  sys.setBlockGroup([11, 11, 17, 18, 17, 18], [7, 8, 7, 8, 10, 11], [2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1], NORMAL, 5);
+}
+
+// 3-5.
+function createBlockPattern14(){
+	let sys = mySystem.state.play.gameSystem;
+	for(let y = 6; y <= 15; y += 3){sys.setBlock(1, y, 2, 1); }
+	for(let y = 4; y <= 13; y += 3){sys.setBlock(21, y, 2, 1); }
+	sys.setBlockGroup([3, 12], [7, 4], [2, 2], [1, 1], LIFEUP, 1);
+	sys.setBlockGroup([9, 9, 10, 11, 17, 18, 18, 19], [7, 8, 9, 7, 10, 9, 11, 10],
+		                [2, 1, 2, 1, 1, 1, 1, 1], [1, 2, 1, 2, 1, 1, 1, 1], NORMAL, 2);
+	sys.setBlockGroup([6, 8, 10], [10, 11, 12], [2, 2, 2], [2, 2, 2], NORMAL, 3);
+	sys.setBlockGroup([6, 8, 8, 10, 15, 15, 16, 17], [12, 10, 13, 11, 7, 9, 7, 8],
+		                [2, 2, 2, 2, 1, 2, 2, 1], [1, 1, 1, 1, 2, 1, 1, 2], NORMAL, 3);
+	sys.setBlockGroup([7, 10, 14, 16], [6, 5, 5, 6], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 3);
+	sys.setBlockGroup([13, 14, 14, 15], [11, 10, 12, 11], [1, 1, 1, 1], [1, 1, 1, 1], NORMAL, 3);
+	sys.setBlockGroup([5, 6, 6, 7], [8, 7, 9, 8], [1, 1, 1, 1], [1, 1, 1, 1], NORMAL, 4);
+	sys.setBlockGroup([12, 13, 13, 14], [7, 6, 8, 7], [1, 1, 1, 1], [1, 1, 1, 1], NORMAL, 5);
+	sys.setBlockGroup([3, 8, 18, 19, 4, 18], [14, 4, 5, 14, 12, 12], [2, 2, 2, 2, 2, 2], [2, 2, 2, 2, 1, 1], NORMAL, 5);
+}
+
+// 4-1.
+function createBlockPattern15(){
+	let sys = mySystem.state.play.gameSystem;
+	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 6, 2, 1, NORMAL, 1); }
+	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 7, 2, 1, NORMAL, 2); }
+	for(let x = 3; x <= 19; x += 2){if(x !== 11){ sys.setBlock(x, 8, 2, 1, NORMAL, 3); }else{ sys.setBlock(x, 8, 2, 1, LIFEUP, 1); } }
+	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 9, 2, 1, NORMAL, 4); }
+	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 10, 2, 1, NORMAL, 5); }
+	sys.setBlockGroup([5, 7, 9, 11, 13, 15, 17], [11, 12, 13, 12, 13, 12, 11],
+		                [2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
+}
+
+// 4-2.
+function createBlockPattern16(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([7, 15], [7, 7], [2, 2], [1, 1]);
+	sys.setBlockGroup([11, 11], [6, 9], [2, 2], [1, 1], LIFEUP, 1);
+	sys.setBlockGroup([9, 13], [6, 6], [2, 2], [1, 1], NORMAL, 4);
+	for(let x = 8; x <= 14; x += 2){sys.setBlock(x, 10, 2, 1, NORMAL, 3); }
+	sys.setBlockGroup([2, 3, 5, 7, 9, 11, 12, 14, 15, 17, 19, 21], [12, 14, 13, 14, 11, 11, 11, 11, 14, 13, 14, 12],
+		                [1, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 1], [2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2], NORMAL, 1);
+	sys.setBlockGroup([4, 5, 7, 15, 17, 19, 3, 3, 19, 19], [6, 6, 6, 6, 6, 6, 8, 10, 8, 10],
+										[1, 2, 2, 2, 2, 1, 2, 2, 2, 2], [2, 1, 1, 1, 1, 2, 2, 2, 2, 2], NORMAL, 5);
+	sys.setBlockGroup([5, 5, 6, 7, 16, 16, 17, 18], [8, 9, 10, 8, 8, 10, 8, 9],
+										[2, 1, 2, 1, 1, 2, 2, 1], [1, 2, 1, 2, 2, 1, 1, 2], NORMAL, 5);
+}
+
+// 4-3.
+function createBlockPattern17(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([9, 13], [7, 7], [2, 2], [1, 1], LIFEUP, 1);
+	sys.setBlockGroup([3, 19], [5, 5], [2, 2], [1, 1], NORMAL, 3);
+	for(let x = 7; x <= 15; x += 4){sys.setBlock(x, 5, 2, 1, NORMAL, 4); }
+	for(let x = 4; x <= 18; x += 2){sys.setBlock(x, 6, 2, 1, NORMAL, 3); }
+	for(let y = 6; y <= 14; y += 2){sys.setBlock(3, y, 1, 2, NORMAL, 3); }
+	for(let y = 6; y <= 14; y += 2){sys.setBlock(20, y, 1, 2, NORMAL, 3); }
+	for(let y = 7; y <= 14; y += 1){sys.setBlock(11, y, 2, 1, NORMAL, 3); }
+	sys.setBlockGroup([9, 10, 13, 14], [14, 13, 13, 14], [1, 1, 1, 1], [1, 1, 1, 1], NORMAL, 5);
+	for(let y = 8; y <= 12; y += 1){sys.setBlock(7, y, 2, 1, NORMAL, 4); }
+	for(let y = 8; y <= 12; y += 1){sys.setBlock(15, y, 2, 1, NORMAL, 4); }
+}
+
+// 4-4.
+function createBlockPattern18(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([10, 12], [9, 11], [2, 2], [1, 1]);
+	sys.setBlockGroup([11, 4, 18], [4, 10, 10], [2, 2, 2], [1, 1, 1], LIFEUP, 1);
+	sys.setBlockGroup([2, 4, 6, 6, 6, 8, 8, 14, 14, 16, 16, 16, 18, 20], [8, 7, 6, 8, 12, 5, 13, 5, 13, 6, 8, 12, 7, 8],
+		                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
+	sys.setBlockGroup([11, 11, 11, 11], [6, 7, 13, 14], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 2);
+	sys.setBlockGroup([11, 10, 10, 12, 12], [5, 8, 12, 8, 12], [2, 2, 2, 2, 2], [1, 1, 1, 1, 1], NORMAL, 3);
+	sys.setBlockGroup([2, 2, 2, 2, 4, 4, 18, 18, 20, 20, 20, 20], [10, 12, 13, 14, 9, 11, 9, 11, 10, 12, 13, 14],
+		                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 3);
+	sys.setBlockGroup([6, 16], [10, 10], [2, 2], [1, 1], NORMAL, 4);
+	sys.setBlockGroup([8, 8, 14, 14], [9, 11, 9, 11], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 5);
+}
+
+// 4-5.
+function createBlockPattern19(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([1, 21], [6, 6], [2, 2], [1, 1], LIFEUP, 1);
+	sys.setBlockGroup([11, 11], [7, 10], [2, 2], [1, 1], NORMAL, 4);
+	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 5, 2, 1, NORMAL, 3); }
+	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 6, 2, 1, NORMAL, 4); }
+	for(let x = 1; x <= 5; x += 2){sys.setBlock(x, 7, 2, 1, NORMAL, 3); }
+	for(let x = 17; x <= 21; x += 2){sys.setBlock(x, 7, 2, 1, NORMAL, 3); }
+	for(let x = 1; x <= 21; x += 2){sys.setBlock(x, 8, 2, 1, NORMAL, 5); }
+	for(let x = 1; x <= 21; x += 2){sys.setBlock(x, 9, 2, 1, NORMAL, 3); }
+	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 11, 2, 1, NORMAL, 2); }
+	for(let x = 1; x <= 5; x += 2){sys.setBlock(x, 12, 2, 1, NORMAL, 3); }
+	for(let x = 17; x <= 21; x += 2){sys.setBlock(x, 12, 2, 1, NORMAL, 3); }
+	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 13, 2, 1, NORMAL, 2); }
+	for(let x = 1; x <= 3; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
+	for(let x = 19; x <= 21; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 }
 
 // ----------------------------------------------------------------------------------- //
@@ -1350,15 +1454,19 @@ class Ball{
 		this.x += this.speed * cos(this.direction);
 		this.y += this.speed * sin(this.direction);
 	}
+	drawAura(gr){
+		// オーラ描画
+		gr.stroke(25, 100, 100);
+		gr.noFill();
+		gr.strokeWeight(2);
+		const barLength = this.poweredCount * Math.PI * 2 / 240;
+		gr.arc(this.x, this.y, this.radius * 4, this.radius * 4, -Math.PI / 2, -Math.PI / 2 + barLength);
+		gr.noStroke();
+	}
 	draw(gr){
 		gr.image(this.gr, this.x - this.radius, this.y - this.radius);
 		if(this.level > 0){
-		  gr.stroke(25, 100, 100);
-			gr.noFill();
-		  gr.strokeWeight(2);
-		  const barLength = this.poweredCount * Math.PI * 2 / 240;
-		  gr.arc(this.x, this.y, this.radius * 4, this.radius * 4, -Math.PI / 2, -Math.PI / 2 + barLength);
-		  gr.noStroke();
+      this.drawAura(gr);
 		}
 	}
 }
