@@ -803,7 +803,7 @@ class GameSystem{
 		this.ball.initialize(); // ボールの初期化
 		// パターンを用意する
 		createStagePattern0();
-		window["createBlockPattern" + 9]();
+		window["createBlockPattern" + 12]();
     // ボールをパドルにセットする
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
@@ -856,6 +856,15 @@ class GameSystem{
 				break;
 		}
 	}
+	getAdditionalBlocks(b){
+		let add = [];
+		for(let x = 0; x < b.w / GRIDSIZE; x++){
+			for(let y = 0; y < b.h / GRIDSIZE; y++){
+				add.push(new Block(b.x / GRIDSIZE + x, b.y / GRIDSIZE + y, 1, 1, NORMAL, 1));
+			}
+		}
+		return add;
+	}
 	collideWithBlocks(){
 		// 衝突時はボール側だけパーティクル出そうか（小さいの）
 		// 壊れるようなら・・その分も出す。
@@ -892,10 +901,18 @@ class GameSystem{
 		}
 		// 壊したブロックがあればそれを排除する処理
 		let id = -1;
+		let additionalBlocks = [];
 		for(let i = 0; i < this.blocks.length; i++){
-			if(!this.blocks[i].isAlive()){ id = i; break; }
+			let b = this.blocks[i];
+			if(!b.isAlive()){
+				// 分裂があればここでブロックを追加
+				if(b.hasChild){ additionalBlocks = this.getAdditionalBlocks(b); }
+				id = i;
+				break;
+			}
 		}
 		if(id >= 0){ this.blocks.splice(id, 1); }
+		this.blocks.push(...additionalBlocks); // 追加があれば追加
 	}
 	collideWithPaddles(){
 		for(let pdl of this.paddles){
@@ -1156,6 +1173,58 @@ function createBlockPattern9(){
 	sys.setBlockGroup([11, 11], [10, 11], [2, 2], [1, 1], NORMAL, 5);
 }
 
+// 3-1以降作る前に、あれ、40x40以上のときに分裂する仕様作る。条件はNORMALかLIFEで1でダメージが1のときに限り、
+// 攻撃力1で受けて0になった場合に限り、小さいものに分裂する、みたいな。オーバーキルならOK.オレンジで攻撃2で消える場合もOK.
+function createBlockPattern10(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([1, 1, 18, 22, 5, 18], [4, 5, 4, 5, 8, 8], [5, 1, 5, 1, 1, 1], [1, 4, 1, 4, 1, 1]);
+	for(let x = 8; x <= 14; x += 2){for(let y = 5; y <= 6; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
+	for(let x = 8; x <= 14; x += 2){for(let y = 7; y <= 8; y++){
+		if(x === 10 && y === 7){ sys.setBlock(x, y, 2, 1, LIFEUP, 1); }else{ sys.setBlock(x, y, 2, 1, NORMAL, 2); }
+	}}
+	for(let x = 8; x <= 14; x += 2){for(let y = 9; y <= 10; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
+	for(let x = 8; x <= 14; x += 2){sys.setBlock(x, 11, 2, 2, NORMAL, 2); }
+	for(let x = 8; x <= 14; x += 2){sys.setBlock(x, 13, 2, 2, NORMAL, 1); }
+	sys.setBlockGroup([2, 4, 6, 16, 18, 20], [11, 9, 7, 7, 9, 11], [2, 2, 2, 2, 2, 2], [2, 2, 2, 2, 2, 2], NORMAL, 3);
+}
+
+// 3-2
+function createBlockPattern11(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([3, 20], [6, 6], [1, 1], [1, 1]);
+  sys.setBlockGroup([7, 7, 16, 16, 11], [6, 10, 6, 10, 6], [1, 1, 1, 1, 2], [1, 1, 1, 1, 1], NORMAL, 1);
+	sys.setBlockGroup([6, 8, 15, 17, 6, 8, 15, 17, 6, 16, 11], [7, 7, 7, 7, 9, 9, 9, 9, 13, 13, 7],
+		                [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 2);
+	sys.setBlockGroup([5, 17, 4, 19, 5, 9, 14, 18, 8, 14, 4, 18], [5, 5, 6, 6, 8, 8, 8, 8, 11, 11, 12, 12],
+		                [2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2], [1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1], NORMAL, 3);
+	for(let x = 10; x <= 12; x += 2){for(let y = 9; y <= 10; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
+	sys.setBlockGroup([11, 11], [5, 8], [2, 2], [1, 1], LIFEUP, 1);
+	sys.setBlockGroup([2, 20, 1, 4, 19, 22, 2, 20, 9, 13], [8, 8, 9, 9, 9, 9, 11, 11, 5, 5],
+		                [2, 2, 1, 1, 1, 1, 2, 2, 2, 2], [1, 1, 2, 2, 2, 2, 1, 1, 1, 1], NORMAL, 4);
+  sys.setBlockGroup([5, 17], [10, 10], [2, 2], [2, 2], NORMAL, 5);
+}
+
+// 3-3.
+function createBlockPattern12(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlockGroup([3, 3, 18, 20], [6, 7, 6, 7], [3, 1, 3, 1], [1, 4, 1, 4]);
+	sys.setBlockGroup([3, 19], [5, 5], [2, 2], [1, 1], LIFEUP, 1);
+	sys.setBlockGroup([2, 6, 7, 8, 14, 16, 16, 20], [13, 9, 11, 13, 13, 9, 11, 13],
+		                [2, 2, 1, 2, 2, 2, 1, 2], [1, 1, 2, 1, 1, 1, 2, 1], NORMAL, 1);
+	for(let y = 9; y <= 13; y += 1){sys.setBlock(4, y, 2, 1, NORMAL, 1); }
+	for(let y = 9; y <= 13; y += 1){sys.setBlock(18, y, 2, 1, NORMAL, 1); }
+	sys.setBlockGroup([11, 12, 11, 12, 11], [5, 7, 9, 11, 13], [1, 1, 1, 1, 1], [2, 2, 2, 2, 2], NORMAL, 2);
+	sys.setBlockGroup([13, 10, 13, 10], [6, 8, 9, 11], [1, 1, 1, 1], [1, 1, 1, 1], NORMAL, 3);
+	sys.setBlockGroup([6, 8, 14, 16, 8, 14], [7, 7, 7, 7, 10, 10], [2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1], NORMAL, 3);
+	sys.setBlockGroup([4, 18], [7, 7], [2, 2], [2, 2], NORMAL, 3);
+	sys.setBlockGroup([1, 21], [9, 9], [2, 2], [2, 2], NORMAL, 4);
+}
+
+// 3-4.
+function createBlockPattern13(){
+	let sys = mySystem.state.play.gameSystem;
+}
+
 // ----------------------------------------------------------------------------------- //
 // ball.
 
@@ -1230,6 +1299,7 @@ class Ball{
 		switch(_block.blockType){
 			case LIFEUP:
 			  this.life++;
+				if(this.life > 20){ this.life = 20; }
 				break;
 		}
 	}
@@ -1446,6 +1516,7 @@ class Block{
 		this.gr = createGraphics(this.w, this.h);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
+		this.hasChild = false; // これをtrueにしてブロック排除の際にtrueにする
 		this.drawBlockImage();
 	}
 	getId(){
@@ -1483,6 +1554,9 @@ class Block{
 	}
 	hitWithBall(_ball){
 		if(this.tough > 2 && _ball.attack < 2){ return; }
+		// タフネス1でダメージも1でかつwもhもGRIDSIZEx2以上の大きさの時に限り分裂. NORMALでもLIFEUPでも。
+		// LIFEUPの場合は上手くすれば5UPできるというわけ
+		if(this.tough === 1 && _ball.attack === 1 && this.w > GRIDSIZE && this.h > GRIDSIZE){ this.hasChild = true; }
 		this.tough = max(0, this.tough - _ball.attack);
 		if(this.tough === 0){ this.kill(); return; }
 		// returnしないと実行されちゃうでしょこの馬鹿！！！！！！
