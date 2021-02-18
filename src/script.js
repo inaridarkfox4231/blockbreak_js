@@ -803,8 +803,8 @@ class GameSystem{
 		// ボール
 		this.ball.initialize(); // ボールの初期化
 		// パターンを用意する
-		createStagePattern0();
-		window["createBlockPattern" + 19]();
+		createStagePattern1();
+		window["createBlockPattern" + 20]();
     // ボールをパドルにセットする
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
@@ -1035,6 +1035,24 @@ function createStagePattern0(){
 	// パドル
 	const paddleLength = PADDLE_LENGTH[sys.mode];
 	sys.paddles.push(new LinePaddle(20, 460 - paddleLength, 416, 416, paddleLength, 4, -PI/2));
+}
+
+// 上下パドル
+function createStagePattern1(){
+	let sys = mySystem.state.play.gameSystem;
+	// setup
+	sys.stageSetup(560, 560);
+	// ガター
+	const colliders = [new RectCollider(0, 60, 560, 20), new RectCollider(0, 540, 560, 20),
+	                   new RectCollider(0, 80, 16, 460), new RectCollider(544, 80, 16, 460)];
+	sys.gutter.setting(560, 560, colliders);
+	// ブロック
+	sys.blocks.push(new Block(0.8, 4, 0.2, 23));
+	sys.blocks.push(new Block(27, 4, 0.2, 23));
+	// パドル
+	const paddleLength = PADDLE_LENGTH[sys.mode];
+	sys.paddles.push(new LinePaddle(20, 540 - paddleLength, 536, 536, paddleLength, 4, -PI / 2),
+                   new LinePaddle(20, 540 - paddleLength, 80, 80, paddleLength, 4, PI / 2));
 }
 
 // 1-1.
@@ -1334,6 +1352,11 @@ function createBlockPattern19(){
 	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 13, 2, 1, NORMAL, 2); }
 	for(let x = 1; x <= 3; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 	for(let x = 19; x <= 21; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
+}
+
+function createBlockPattern20(){
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlock(6, 6, 2, 1, NORMAL, 5);
 }
 
 // ----------------------------------------------------------------------------------- //
