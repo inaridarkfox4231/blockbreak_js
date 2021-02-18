@@ -13,6 +13,8 @@ const CANVAS_W = 800;
 const CANVAS_H = 600;
 const GRIDSIZE = 20;
 
+const STAGE_MAX = 19; // 最大ステージ数
+
 // KEYCODE定数
 const K_ENTER = 13;
 const K_RIGHT = 39;
@@ -22,7 +24,7 @@ const K_DOWN = 40;
 const K_SPACE = 32;
 
 // ライフ
-const LIFES = [3, 5, 10, 15];
+//const LIFES = [3, 5, 10, 15];
 // ステータス
 const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
 // パドル長
@@ -42,7 +44,7 @@ const MODE_HUE = [40, 55, 70, 85]
 // if(type===NORMAL&&w==40&&h==40&&tough==0){ 分裂 } (2x2で1ダメージ受けた場合に限り4つの1x1にばらける仕様作りたい)
 // playの方であれこれやれば出来ると思う。
 const NORMAL = 0;
-const LIFEUP = 1;
+//const LIFEUP = 1;
 const WALL = 2;
 
 // particle関連
@@ -338,7 +340,7 @@ class Music{
 class System{
 	constructor(){
 		this.state = {title:new Title(this), play:new Play(this),
-		              pause:new Pause(this), gameover:new Gameover(this), clear:new Clear(this)};
+		              pause:new Pause(this), clear:new Clear(this)}; // ゲームオーバー廃止
 		this.currentState = this.state.title;
 	}
   getState(stateName){
@@ -396,7 +398,8 @@ class Title extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "title";
-		this.level = 0;
+		//this.level = 0;
+		this.stage = 0; // レベル廃止
 		this.mode = 0;
 		this.levelSpace = createGraphics(80 + 440, 40);
 		this.modeSpace = createGraphics(70 + 350, 40);
@@ -444,7 +447,7 @@ class Title extends State{
 	drawLevelButtons(){
 		this.levelSpace.clear();
 		for(let i = 0; i < 5; i++){
-			if(i === this.level){
+			if(i === floor(this.stage / 5)){
 				this.drawActiveButton(this.levelSpace, 80 + 90 * i, 0, "Lv." + i, 20);
 			}else{
 				this.drawNonActiveButton(this.levelSpace, 80 + 90 * i, 0, "Lv." + i);
@@ -484,7 +487,8 @@ class Title extends State{
 	}
 	prepare(_state){
 		// いろいろリセットしないとダメ
-		this.level = 0;
+		// this.level = 0;
+		this.stage = 0;
 		this.mode = 0;
 		this.drawLevelButtons();
 		this.drawModeButtons();
@@ -504,9 +508,9 @@ class Title extends State{
 		const my = mouseY;
 		if(mx > 220 && mx < 660 && my > 300 && my < 340){
 			if((mx - 220) % 90 > 80){ return; }
-			const newLevel = Math.floor((mx - 220) / 90);
-			if(newLevel !== this.level){
-				this.level = newLevel;
+			const newStage = Math.floor((mx - 220) / 90) * 5; // そのうちね
+			if(newStage !== this.stage){
+				this.stage = newStage;
 				myMusic.playDecisionSound();
 			}
 			this.drawLevelButtons();
@@ -568,7 +572,7 @@ class Play extends State{
 		super(_node);
 		this.name = "play";
 		this.gameSystem = new GameSystem();
-		this.level = 0;
+		//this.level = 0;
 		this.stage = 0;
 		this.offSet = {}; // ゲームシステム側のグラフィックを表示する際のオフセット
 		this.preAnimationSpan = 60;
@@ -586,11 +590,12 @@ class Play extends State{
 			  return;
 			case "title":
 			  this.gameSystem.initialize(_state.mode); // 1を引くって感じで。mode（難易度）設定。
-				this.level = _state.level; // レベル番号要るかな・・んー
-				this.stage = 0; // ステージ番号リセット
+				this.stage = _state.stage; // 0, 5, 10, 15ですねー
+				//this.level = _state.level; // レベル番号要るかな・・んー
+				//this.stage = 0; // ステージ番号リセット
 				break;
 		}
-		this.gameSystem.setPattern(this.level, this.stage); // レベルとステージは両方必要
+		this.gameSystem.setPattern(this.stage); // レベルとステージは両方必要
 		this.offSet = this.gameSystem.getOffSet(); // オフセットを計算する
 
 		this.preAnimationSpan = 60; // 0になるまでいろいろキャンセルしてステージ番号を表示
@@ -616,19 +621,22 @@ class Play extends State{
 		this.gameSystem.update();
 
 		// ゲームオーバーにするか否かの処理。trueを返したらゲームオーバーに移行する
-		if(this.gameSystem.gameoverCheck()){
-			this.setNextState("gameover");
-		}
+		// それは廃止。復活処理。
+		this.gameSystem.revival();
+		//if(this.gameSystem.gameoverCheck()){
+		//	this.setNextState("gameover");
+		//}
 		// クリアにする。true返したら、ステージ番号増やす。5になったらplayに戻さずにタイトルへ。
 		if(this.gameSystem.clearCheck()){
 			this.stage++;
+			if(this.stage > STAGE_MAX){ this.stage = 0; } // 最初に戻る
 			this.setNextState("clear");
 		}
 	}
 	showPreAnimation(){
 		this.gr.background(0);
 		this.gr.fill(255);
-		this.gr.text("STAGE " + this.level + "-" + this.stage, CANVAS_W * 0.5, CANVAS_H * 0.5);
+		this.gr.text("STAGE " + this.stage, CANVAS_W * 0.5, CANVAS_H * 0.5);
 		image(this.gr, 0, 0);
 	}
 	draw(){
@@ -676,6 +684,7 @@ class Pause extends State{
 // ゲームオーバーについてはPlayの画像を借りつつちょっと薄暗くして中央に文字描いて終わり的な。
 // テトリスのようなアニメは無くって文字だけ。エンターキーで戻る。
 // Playからしか来ない。
+/*
 class Gameover extends State{
 	constructor(_node){
 		super(_node);
@@ -705,13 +714,15 @@ class Gameover extends State{
 		image(this.gr, 0, 0);
 	}
 }
+*/
 
 // Playから来る。stageを読み取り、5より小さいならPlayに戻して次のステージを用意する。
+// オールクリア廃止
 class Clear extends State{
 	constructor(_node){
 		super(_node);
 		this.name = "clear";
-		this.allClearFlag = false;
+		//this.allClearFlag = false;
 		this.gr.fill(255);
 		this.gr.textFont(huiFont);
 		this.gr.textSize(CANVAS_H * 0.08);
@@ -719,32 +730,32 @@ class Clear extends State{
 	}
 	drawPrepare(){} // 準備描画（最初に一回だけやる）
   prepare(_state){
-		this.allClearFlag = (_state.stage < 5 ? false : true);
+		//this.allClearFlag = (_state.stage < 5 ? false : true);
 		this.gr.image(_state.gr, 0, 0);
 		this.gr.background(0, 128);
-		if(this.allClearFlag){
-			this.gr.text("STAGE ALL CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
-			this.gr.text("CLICK TO TITLE", CANVAS_W * 0.5, CANVAS_H * 0.54);
-		}else{
-			this.gr.text("STAGE CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
-			this.gr.text("CLICK TO NEXT STAGE", CANVAS_W * 0.5, CANVAS_H * 0.54);
-		}
+		//if(this.allClearFlag){
+		//	this.gr.text("STAGE ALL CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
+		//	this.gr.text("CLICK TO TITLE", CANVAS_W * 0.5, CANVAS_H * 0.54);
+		//}else{
+		this.gr.text("STAGE CLEAR!", CANVAS_W * 0.5, CANVAS_H * 0.46);
+		this.gr.text("CLICK TO NEXT STAGE", CANVAS_W * 0.5, CANVAS_H * 0.54);
+		//}
 	}
   keyAction(code){
 		if(code === K_ENTER){
-			if(this.allClearFlag){
-				this.setNextState("title");
-			}else{
-				this.setNextState("play");
-			}
+			//if(this.allClearFlag){
+			//	this.setNextState("title");
+			//}else{
+			this.setNextState("play");
+			//}
 		}
 	}
 	clickAction(){
-		if(this.allClearFlag){
-			this.setNextState("title");
-		}else{
-			this.setNextState("play");
-		}
+		//if(this.allClearFlag){
+		//	this.setNextState("title");
+		//}else{
+		this.setNextState("play");
+		//}
 	}
 	update(){}
 	draw(){
@@ -760,7 +771,7 @@ class Clear extends State{
 class GameSystem{
 	constructor(){
 		this.gr = undefined; // グラフィック
-		this.score = 0;
+		//this.score = 0; // スコア廃止
 		this.mode = 0;
 		this.gutter = new Gutter(); // ガター
 		this.blocks = []; // ブロック
@@ -768,7 +779,7 @@ class GameSystem{
 		this.paddles = []; // パドル
 		this.ball = new Ball(); // ボール
 		this.currentPaddleId = -1; // ボールが属するパドルのid. シフトキーで移動させるのに使う可能性がある
-		this.level = 0;
+		//this.level = 0;
 		this.stage = 0;
 		// パーティクルシステム
 		// システム側に画像を持たせてそれを乗せるか。
@@ -795,16 +806,16 @@ class GameSystem{
 			this.blocks.push(new Block(xArray[i], yArray[i], wArray[i], hArray[i], _type, tough));
 		}
 	}
-	setPattern(level, stage){
+	setPattern(stage){
 		// levelとstageによりjsonからステージシードを引き出す：
 		// const seed = stageData["level" + level]["stage" + stage];
-		this.level = level; // 描画用
+		//this.level = level; // 描画用
 		this.stage = stage; // 描画用
 		// ボール
 		this.ball.initialize(); // ボールの初期化
 		// パターンを用意する
-		createStagePattern1();
-		window["createBlockPattern" + 20]();
+		//createStagePattern1();
+		window["createStage" + stage]();
     // ボールをパドルにセットする
 		this.paddles[0].setBall(this.ball);
 		this.currentPaddleId = 0;
@@ -813,9 +824,9 @@ class GameSystem{
 	}
 	initialize(mode){
 		// レベルの最初に行なう処理。スコアのリセットとライフ設定
-		this.score = 0;
+		//this.score = 0; // スコア廃止
 		this.mode = mode;
-		this.ball.setLife(LIFES[mode]);
+		//this.ball.setLife(LIFES[mode]);
 	}
 	getOffSet(){
 		return {x:(CANVAS_W - this.gr.width) * 0.5, y:(CANVAS_H - this.gr.height) * 0.5};
@@ -857,9 +868,9 @@ class GameSystem{
 			case NORMAL:
 			  myMusic.playBlockSound(id + 7 * this.ball.level);
 				break;
-			case LIFEUP:
-			  myMusic.playBlockSound(5 + 7 * this.ball.level);
-				break;
+			//case LIFEUP:
+			//  myMusic.playBlockSound(5 + 7 * this.ball.level);
+			//	break;
 		}
 	}
 	getAdditionalBlocks(b){
@@ -963,17 +974,15 @@ class GameSystem{
 			}
 		}
 	}
-	gameoverCheck(){
+	revival(){
+		// 復活処理
 		// ここでパーティクルが残ってたら移動しないようにする・・
 		if(!this.particles.isEmpty()){ return false; }
+		// 生きてたら処理なし
 		if(this.ball.isAlive()){ return false; }
-		if(!this.ball.isAlive() && this.ball.getLife() > 0){
-      this.ball.initialize();
-			this.paddles[0].setBall(this.ball);
-			this.currentPaddleId = 0;
-			return false;
-		}
-		return true;
+    this.ball.initialize();
+		this.paddles[0].setBall(this.ball);
+		this.currentPaddleId = 0;
 	}
 	clearCheck(){
 		// パーティクルが残ってたら移動しないようにする・・
@@ -1002,11 +1011,13 @@ class GameSystem{
 		// ステージ番号を描画
 		// スコアを描画
 		// ライフを描画
+		/*
 		for(let k = 0; k < this.ball.getLife(); k++){
 			let cx = 180 + 30 * (k % 10) + 15;
 			let cy = Math.floor(k / 10) * 30 + 15;
 			this.gr.circle(cx, cy, 25);
 		}
+		*/
 	}
 }
 
@@ -1015,6 +1026,8 @@ class GameSystem{
 // ステージパターン（量産型の）。
 // 具体的にはガター、パドル、WALL型ブロックの一部とringWallの指定を行なう。
 // それ以外の部分は個別に用意する感じね。予定では0～24は円形パドルは出さないつもり。
+
+// stagePatternとstageを分ける感じね。createStageの中で何らかのパターンを呼び出すっていうね。
 
 // オーソドックスなパドルが1つのステージ
 // ガターは両サイド2つと下にひとつ
@@ -1038,25 +1051,27 @@ function createStagePattern0(){
 }
 
 // 上下パドル
+// 間延びしがちなので適度に壊せないブロック置かないと退屈になる可能性あり。他のステージにも言えるけどね。
 function createStagePattern1(){
 	let sys = mySystem.state.play.gameSystem;
 	// setup
-	sys.stageSetup(560, 560);
+	sys.stageSetup(480, 460);
 	// ガター
-	const colliders = [new RectCollider(0, 60, 560, 20), new RectCollider(0, 540, 560, 20),
-	                   new RectCollider(0, 80, 16, 460), new RectCollider(544, 80, 16, 460)];
-	sys.gutter.setting(560, 560, colliders);
+	const colliders = [new RectCollider(0, 60, 480, 20), new RectCollider(0, 440, 480, 20),
+	                   new RectCollider(0, 80, 16, 360), new RectCollider(464, 80, 16, 360)];
+	sys.gutter.setting(480, 460, colliders);
 	// ブロック
-	sys.blocks.push(new Block(0.8, 4, 0.2, 23));
-	sys.blocks.push(new Block(27, 4, 0.2, 23));
+	sys.blocks.push(new Block(0.8, 4, 0.2, 18));
+	sys.blocks.push(new Block(23, 4, 0.2, 18));
 	// パドル
 	const paddleLength = PADDLE_LENGTH[sys.mode];
-	sys.paddles.push(new LinePaddle(20, 540 - paddleLength, 536, 536, paddleLength, 4, -PI / 2),
-                   new LinePaddle(20, 540 - paddleLength, 80, 80, paddleLength, 4, PI / 2));
+	sys.paddles.push(new LinePaddle(20, 460 - paddleLength, 436, 436, paddleLength, 4, -PI / 2),
+                   new LinePaddle(20, 460 - paddleLength, 80, 80, paddleLength, 4, PI / 2));
 }
 
-// 1-1.
-function createBlockPattern0(){
+// 0.
+function createStage0(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	for(let x = 6; x <= 16; x += 2){
 		for(let y = 7; y <= 8; y++){
@@ -1068,11 +1083,12 @@ function createBlockPattern0(){
 			sys.setBlock(x, y, 2, 1, NORMAL, 2);
 		}
 	}
-	sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
+	//sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
 }
 
-// 1-2.
-function createBlockPattern1(){
+// 1.
+function createStage(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([11, 9, 11, 13, 7, 9, 13, 15], [5, 6, 6, 6, 7, 7, 7, 7],
 		                [2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
@@ -1080,11 +1096,12 @@ function createBlockPattern1(){
 		                [2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 2);
 	sys.setBlockGroup([5, 7, 15, 17, 3, 5, 17, 19], [12, 12, 12, 12, 13, 13, 13, 13],
 		                [2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 3);
-	sys.setBlock(11, 4, 2, 1, LIFEUP, 1);
+	//sys.setBlock(11, 4, 2, 1, LIFEUP, 1);
 }
 
-// 1-3.
-function createBlockPattern2(){
+// 2.
+function createStage2(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21], [9, 8, 7, 6, 5, 4, 5, 6, 7, 8, 9],
 		                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
@@ -1092,13 +1109,14 @@ function createBlockPattern2(){
 		                [2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 2);
 	sys.setBlockGroup([5, 7, 9, 11, 13, 15, 17], [11, 10, 9, 8, 9, 10, 11],
 		                [2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1], NORMAL, 3);
-	sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
+	//sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
 }
 
-// 1-4.
-function createBlockPattern3(){
+// 3.
+function createStgae3(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlock(11, 4, 2, 1, LIFEUP, 1);
+	//sys.setBlock(11, 4, 2, 1, LIFEUP, 1);
 	sys.setBlockGroup([7, 15], [6, 6], [2, 2], [1, 1], NORMAL, 1);
 	for(let x = 9; x <= 13; x += 2){for(let y = 5; y <= 7; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 	sys.setBlockGroup([5, 17], [7, 7], [2, 2], [1, 1], NORMAL, 2);
@@ -1108,10 +1126,11 @@ function createBlockPattern3(){
 	for(let x = 15; x <= 21; x += 2){for(let y = 12; y <= 13; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
 }
 
-// 1-5.
-function createBlockPattern4(){
+// 4.
+function createStage4(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
+	//sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
 	for(let x = 3; x <= 7; x += 2){for(let y = 5; y <= 6; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 	for(let x = 15; x <= 19; x += 2){for(let y = 5; y <= 6; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 	for(let x = 9; x <= 13; x += 2){for(let y = 9; y <= 10; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 2); }}
@@ -1121,8 +1140,9 @@ function createBlockPattern4(){
 	sys.setBlockGroup([3, 5, 11, 11, 17, 19], [8, 8, 6, 7, 8, 8], [2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1], NORMAL, 5);
 }
 
-// 2-1.
-function createBlockPattern5(){
+// 5.
+function createStage5(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	for(let y = 6; y <= 14; y += 2){sys.setBlock(3, y, 1, 2, NORMAL, 1); }
 	for(let y = 6; y <= 14; y += 2){sys.setBlock(20, y, 1, 2, NORMAL, 1); }
@@ -1133,15 +1153,16 @@ function createBlockPattern5(){
 	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 12, 2, 1, NORMAL, 2); }
 	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 13, 2, 1, NORMAL, 3); }
 	sys.setBlockGroup([9, 11, 13], [10, 10, 10], [2, 2, 2], [1, 1, 1], NORMAL, 5);
-	sys.setBlock(11, 9, 2, 1, LIFEUP, 1);
+	//sys.setBlock(11, 9, 2, 1, LIFEUP, 1);
 }
 
-// 2-2.
-function createBlockPattern6(){
+// 6.
+function createStage6(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([11, 11, 11, 7, 7, 15, 15], [4, 10, 12, 11, 12, 11, 12],
 		                [2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1], NORMAL, 5);
-	sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
+	//sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
 	sys.setBlockGroup([4, 3, 18, 19, 3, 5, 18, 20], [6, 8, 6, 8, 6, 7, 7, 6],
 		                [2, 2, 2, 2, 1, 1, 1, 1], [1, 1, 1, 1, 2, 2, 2, 2], NORMAL, 1);
   sys.setBlockGroup([7, 8, 10, 12, 14, 15, 7, 9, 14, 16, 9, 13], [10, 8, 8, 8, 8, 10, 8, 9, 9, 8, 11, 11],
@@ -1150,10 +1171,11 @@ function createBlockPattern6(){
 		                [2, 2, 2, 2, 2, 2, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 2, 2, 2, 2], NORMAL, 3);
 }
 
-// 2-3.
-function createBlockPattern7(){
+// 7.
+function createStage7(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlock(3, 5, 2, 1, LIFEUP, 1);
+	//sys.setBlock(3, 5, 2, 1, LIFEUP, 1);
 	sys.setBlockGroup([20, 21, 21, 21, 21, 21, 21], [4, 4, 6, 8, 10, 12 ,14],
 		                [1, 1, 1, 1, 1, 1, 1], [1, 2, 2, 2, 2, 2, 2], NORMAL, 1);
   sys.setBlockGroup([2, 2, 2, 2, 2, 2, 3, 3], [4, 6, 8, 10, 12 ,14, 4, 14],
@@ -1165,10 +1187,11 @@ function createBlockPattern7(){
 	sys.setBlock(3, 8, 1, 1, NORMAL, 5);
 }
 
-// 2-4.
-function createBlockPattern8(){
+// 8.
+function createStage8(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlockGroup([11, 11], [7, 8], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([11, 11], [7, 8], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([8, 10, 12, 14, 11, 12], [12, 12, 12, 12, 13, 13],
 		                [2, 2, 2, 2, 1, 1], [1, 1, 1, 1, 2, 2], NORMAL, 1);
   sys.setBlockGroup([3, 5, 3, 5, 7, 18, 20, 16, 18, 20], [9, 9, 13, 13, 13, 9, 9, 13, 13, 13],
@@ -1182,10 +1205,11 @@ function createBlockPattern8(){
 										[2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 5);
 }
 
-// 2-5.
-function createBlockPattern9(){
+// 9.
+function createStage9(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlockGroup([3, 19], [7, 7], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([3, 19], [7, 7], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([1, 1, 1, 21, 21, 21], [12, 13, 14, 12, 13, 14], [2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1], NORMAL, 1);
 	sys.setBlockGroup([1, 1, 21, 21], [9, 10, 9, 10], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 2);
 	sys.setBlockGroup([1, 3, 9, 13, 19, 21], [8, 8, 5, 5, 8, 8], [2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1], NORMAL, 3);
@@ -1198,23 +1222,23 @@ function createBlockPattern9(){
 	sys.setBlockGroup([11, 11], [10, 11], [2, 2], [1, 1], NORMAL, 5);
 }
 
-// 3-1以降作る前に、あれ、40x40以上のときに分裂する仕様作る。条件はNORMALかLIFEで1でダメージが1のときに限り、
+// 10以降作る前に、あれ、40x40以上のときに分裂する仕様作る。条件はNORMALかLIFEで1でダメージが1のときに限り、
 // 攻撃力1で受けて0になった場合に限り、小さいものに分裂する、みたいな。オーバーキルならOK.オレンジで攻撃2で消える場合もOK.
-function createBlockPattern10(){
+function createStage10(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([1, 1, 18, 22, 5, 18], [4, 5, 4, 5, 8, 8], [5, 1, 5, 1, 1, 1], [1, 4, 1, 4, 1, 1]);
 	for(let x = 8; x <= 14; x += 2){for(let y = 5; y <= 6; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
-	for(let x = 8; x <= 14; x += 2){for(let y = 7; y <= 8; y++){
-		if(x === 10 && y === 7){ sys.setBlock(x, y, 2, 1, LIFEUP, 1); }else{ sys.setBlock(x, y, 2, 1, NORMAL, 2); }
-	}}
+	for(let x = 8; x <= 14; x += 2){for(let y = 7; y <= 8; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 2); }}
 	for(let x = 8; x <= 14; x += 2){for(let y = 9; y <= 10; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
 	for(let x = 8; x <= 14; x += 2){sys.setBlock(x, 11, 2, 2, NORMAL, 2); }
 	for(let x = 8; x <= 14; x += 2){sys.setBlock(x, 13, 2, 2, NORMAL, 1); }
 	sys.setBlockGroup([2, 4, 6, 16, 18, 20], [11, 9, 7, 7, 9, 11], [2, 2, 2, 2, 2, 2], [2, 2, 2, 2, 2, 2], NORMAL, 3);
 }
 
-// 3-2
-function createBlockPattern11(){
+// 11
+function createStage11(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([3, 20], [6, 6], [1, 1], [1, 1]);
   sys.setBlockGroup([7, 7, 16, 16, 11], [6, 10, 6, 10, 6], [1, 1, 1, 1, 2], [1, 1, 1, 1, 1], NORMAL, 1);
@@ -1223,17 +1247,18 @@ function createBlockPattern11(){
 	sys.setBlockGroup([5, 17, 4, 19, 5, 9, 14, 18, 8, 14, 4, 18], [5, 5, 6, 6, 8, 8, 8, 8, 11, 11, 12, 12],
 		                [2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2], [1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1], NORMAL, 3);
 	for(let x = 10; x <= 12; x += 2){for(let y = 9; y <= 10; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 3); }}
-	sys.setBlockGroup([11, 11], [5, 8], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([11, 11], [5, 8], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([2, 20, 1, 4, 19, 22, 2, 20, 9, 13], [8, 8, 9, 9, 9, 9, 11, 11, 5, 5],
 		                [2, 2, 1, 1, 1, 1, 2, 2, 2, 2], [1, 1, 2, 2, 2, 2, 1, 1, 1, 1], NORMAL, 4);
   sys.setBlockGroup([5, 17], [10, 10], [2, 2], [2, 2], NORMAL, 5);
 }
 
-// 3-3.
-function createBlockPattern12(){
+// 12.
+function createStage12(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([3, 3, 18, 20], [6, 7, 6, 7], [3, 1, 3, 1], [1, 4, 1, 4]);
-	sys.setBlockGroup([3, 19], [5, 5], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([3, 19], [5, 5], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([2, 6, 7, 8, 14, 16, 16, 20], [13, 9, 11, 13, 13, 9, 11, 13],
 		                [2, 2, 1, 2, 2, 2, 1, 2], [1, 1, 2, 1, 1, 1, 2, 1], NORMAL, 1);
 	for(let y = 9; y <= 13; y += 1){sys.setBlock(4, y, 2, 1, NORMAL, 1); }
@@ -1245,10 +1270,11 @@ function createBlockPattern12(){
 	sys.setBlockGroup([1, 21], [9, 9], [2, 2], [2, 2], NORMAL, 4);
 }
 
-// 3-4.
-function createBlockPattern13(){
+// 13.
+function createStage13(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlockGroup([7, 5], [7, 9], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([7, 5], [7, 9], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([1, 1], [13, 15], [2, 2], [2, 2], NORMAL, 2);
 	for(let x = 4; x <= 20; x += 2){sys.setBlock(x, 5, 2, 1, NORMAL, 1); }
 	for(let y = 6; y <= 10; y += 2){sys.setBlock(21, y, 1, 2, NORMAL, 2); }
@@ -1260,12 +1286,13 @@ function createBlockPattern13(){
   sys.setBlockGroup([11, 11, 17, 18, 17, 18], [7, 8, 7, 8, 10, 11], [2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1], NORMAL, 5);
 }
 
-// 3-5.
-function createBlockPattern14(){
+// 14.
+function createStage14(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	for(let y = 6; y <= 15; y += 3){sys.setBlock(1, y, 2, 1); }
 	for(let y = 4; y <= 13; y += 3){sys.setBlock(21, y, 2, 1); }
-	sys.setBlockGroup([3, 12], [7, 4], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([3, 12], [7, 4], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([9, 9, 10, 11, 17, 18, 18, 19], [7, 8, 9, 7, 10, 9, 11, 10],
 		                [2, 1, 2, 1, 1, 1, 1, 1], [1, 2, 1, 2, 1, 1, 1, 1], NORMAL, 2);
 	sys.setBlockGroup([6, 8, 10], [10, 11, 12], [2, 2, 2], [2, 2, 2], NORMAL, 3);
@@ -1278,23 +1305,25 @@ function createBlockPattern14(){
 	sys.setBlockGroup([3, 8, 18, 19, 4, 18], [14, 4, 5, 14, 12, 12], [2, 2, 2, 2, 2, 2], [2, 2, 2, 2, 1, 1], NORMAL, 5);
 }
 
-// 4-1.
-function createBlockPattern15(){
+// 15.
+function createStage15(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 6, 2, 1, NORMAL, 1); }
-	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 7, 2, 1, NORMAL, 2); }
-	for(let x = 3; x <= 19; x += 2){if(x !== 11){ sys.setBlock(x, 8, 2, 1, NORMAL, 3); }else{ sys.setBlock(x, 8, 2, 1, LIFEUP, 1); } }
+	for(let x = 3; x <= 19; x += 2){ sys.setBlock(x, 6, 2, 1, NORMAL, 1); }
+	for(let x = 3; x <= 19; x += 2){ sys.setBlock(x, 7, 2, 1, NORMAL, 2); }
+	for(let x = 3; x <= 19; x += 2){ sys.setBlock(x, 8, 2, 1, NORMAL, 3); }
 	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 9, 2, 1, NORMAL, 4); }
 	for(let x = 3; x <= 19; x += 2){sys.setBlock(x, 10, 2, 1, NORMAL, 5); }
 	sys.setBlockGroup([5, 7, 9, 11, 13, 15, 17], [11, 12, 13, 12, 13, 12, 11],
 		                [2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
 }
 
-// 4-2.
-function createBlockPattern16(){
+// 16.
+function createStage16(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([7, 15], [7, 7], [2, 2], [1, 1]);
-	sys.setBlockGroup([11, 11], [6, 9], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([11, 11], [6, 9], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([9, 13], [6, 6], [2, 2], [1, 1], NORMAL, 4);
 	for(let x = 8; x <= 14; x += 2){sys.setBlock(x, 10, 2, 1, NORMAL, 3); }
 	sys.setBlockGroup([2, 3, 5, 7, 9, 11, 12, 14, 15, 17, 19, 21], [12, 14, 13, 14, 11, 11, 11, 11, 14, 13, 14, 12],
@@ -1305,10 +1334,11 @@ function createBlockPattern16(){
 										[2, 1, 2, 1, 1, 2, 2, 1], [1, 2, 1, 2, 2, 1, 1, 2], NORMAL, 5);
 }
 
-// 4-3.
-function createBlockPattern17(){
+// 17.
+function createStage17(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlockGroup([9, 13], [7, 7], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([9, 13], [7, 7], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([3, 19], [5, 5], [2, 2], [1, 1], NORMAL, 3);
 	for(let x = 7; x <= 15; x += 4){sys.setBlock(x, 5, 2, 1, NORMAL, 4); }
 	for(let x = 4; x <= 18; x += 2){sys.setBlock(x, 6, 2, 1, NORMAL, 3); }
@@ -1320,11 +1350,12 @@ function createBlockPattern17(){
 	for(let y = 8; y <= 12; y += 1){sys.setBlock(15, y, 2, 1, NORMAL, 4); }
 }
 
-// 4-4.
-function createBlockPattern18(){
+// 18.
+function createStage18(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([10, 12], [9, 11], [2, 2], [1, 1]);
-	sys.setBlockGroup([11, 4, 18], [4, 10, 10], [2, 2, 2], [1, 1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([11, 4, 18], [4, 10, 10], [2, 2, 2], [1, 1, 1], LIFEUP, 1);
 	sys.setBlockGroup([2, 4, 6, 6, 6, 8, 8, 14, 14, 16, 16, 16, 18, 20], [8, 7, 6, 8, 12, 5, 13, 5, 13, 6, 8, 12, 7, 8],
 		                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], NORMAL, 1);
 	sys.setBlockGroup([11, 11, 11, 11], [6, 7, 13, 14], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 2);
@@ -1335,10 +1366,11 @@ function createBlockPattern18(){
 	sys.setBlockGroup([8, 8, 14, 14], [9, 11, 9, 11], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 5);
 }
 
-// 4-5.
-function createBlockPattern19(){
+// 19.
+function createStage19(){
+	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlockGroup([1, 21], [6, 6], [2, 2], [1, 1], LIFEUP, 1);
+	//sys.setBlockGroup([1, 21], [6, 6], [2, 2], [1, 1], LIFEUP, 1);
 	sys.setBlockGroup([11, 11], [7, 10], [2, 2], [1, 1], NORMAL, 4);
 	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 5, 2, 1, NORMAL, 3); }
 	for(let x = 7; x <= 15; x += 2){sys.setBlock(x, 6, 2, 1, NORMAL, 4); }
@@ -1354,9 +1386,10 @@ function createBlockPattern19(){
 	for(let x = 19; x <= 21; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 }
 
-function createBlockPattern20(){
+function createStage25(){
+	createStagePattern1()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlock(6, 6, 2, 1, NORMAL, 5);
+	sys.setBlock(11, 11, 2, 1, NORMAL, 5);
 }
 
 // ----------------------------------------------------------------------------------- //
@@ -1370,7 +1403,7 @@ class Ball{
 	constructor(){
 		this.x = 0;
 		this.y = 0;
-		this.life = 0;
+		// this.life = 0; // life廃止
 		this.alive = true;
 		this.level = 0;
 		this.attack = 1;
@@ -1402,12 +1435,14 @@ class Ball{
 			g.circle(this.radius * 5, this.radius, this.radius * 2 - i);
 		}
 	}
+	/*
 	getLife(){
 		return this.life;
 	}
 	setLife(life){
 		this.life = life;
 	}
+	*/
 	isActive(){
 		return this.active;
 	}
@@ -1422,7 +1457,7 @@ class Ball{
 		this.active = false;
 	}
 	kill(){
-		this.life--;
+		//this.life--;
 		this.alive = false;
 	}
 	setStatus(){
@@ -1434,12 +1469,15 @@ class Ball{
 	}
 	hitWithBlock(_block){
 		// LIFEUPでライフ回復。まあそのくらい。
+		// ライフ無くなった。まあ、強制レベルアップの可能性あるし残しておこう。
+		/*
 		switch(_block.blockType){
 			case LIFEUP:
 			  this.life++;
 				if(this.life > 20){ this.life = 20; }
 				break;
 		}
+		*/
 	}
 	hitWithPaddle(_paddle){
 		// パドルがアクティブのときレベルアップ（ただし上限のときは反応無し）
@@ -1557,8 +1595,8 @@ class LinePaddle extends Paddle{
 		super();
 		this.xRange = [x1, x2];
 		this.yRange = [y1, y2];
-		this.x = 0;
-		this.y = 0;
+		this.x = -100;
+		this.y = -100;
 		this.w = w;
 		this.h = h;
 		this.direction = direction; // ボールが存在する方向（PI/2とか-PI/2とかそういうの）
@@ -1666,8 +1704,8 @@ class Block{
 		switch(this.blockType){
 			case NORMAL:
 			  return this.tough - 1; // toughは1,2,3,4,5であることが前提
-			case LIFEUP:
-			  return 5;
+			//case LIFEUP:
+			//  return 5;
 			case WALL:
 			  return 6;
 		}
@@ -1678,11 +1716,11 @@ class Block{
 			case NORMAL:
 			  Block.normalDraw(this.gr, this.w, this.h, BLOCK_HUE[this.tough - 1]);
 				break;
-			case LIFEUP:
-			  Block.normalDraw(this.gr, this.w, this.h, 88);
+			//case LIFEUP:
+			//  Block.normalDraw(this.gr, this.w, this.h, 88);
 				// ハートマーク描こうね
-				Block.drawHeart(this.gr, this.w * 0.5, this.h * 0.55);
-				break;
+			//	Block.drawHeart(this.gr, this.w * 0.5, this.h * 0.55);
+			//	break;
 			case WALL:
 			  Block.wallDraw(this.gr, this.w, this.h);
 				break;
@@ -1724,6 +1762,7 @@ class Block{
 		gr.fill(50);
 		gr.rect(1, 1, w - 2, h - 2);
 	}
+	/*
 	static drawHeart(gr, cx, cy){
 		gr.stroke(88, 20, 100);
 		gr.strokeWeight(8);
@@ -1734,6 +1773,7 @@ class Block{
 		let l = 4 * Math.sqrt(2);
 		gr.quad(cx, cy - l, cx + l, cy, cx, cy + l, cx - l, cy);
 	}
+	*/
 }
 
 // RingWallはもう別に用意した方がいいと思う。で、当たり判定はブロックと一緒に用意する。
@@ -2015,6 +2055,12 @@ function drawCross(x, y, radius, rotationAngle, shapeColor, gr){
 	gr.quad(x, y, p[5].x, p[5].y, p[1].x, p[1].y, p[4].x, p[4].y);
 	gr.quad(x, y, p[6].x, p[6].y, p[2].x, p[2].y, p[5].x, p[5].y);
 	gr.quad(x, y, p[7].x, p[7].y, p[3].x, p[3].y, p[6].x, p[6].y);
+}
+
+// ハート描きたいね
+// 円2つとquad2つあればいける
+function drawHeart(x, y, radius, rotationAngle, shapeColor, gr){
+/* 工事中 */
 }
 
 
