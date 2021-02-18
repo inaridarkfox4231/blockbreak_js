@@ -29,8 +29,8 @@ const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
 const PADDLE_LENGTH = [80, 60, 40, 30];
 // ブロックヒュー
 const BLOCK_HUE = [18, 10, 0, 78, 65];
-// ブロックやボールが壊れるときの色パレット（黄色、オレンジ、赤、紫、青、ピンク、灰色、ライム）
-const BREAK_PALETTE = ["#fff000", "#ffa500", "#ff0000", "#800080", "#0000cd", "#ff1493", "#888", "lime"];
+// ブロックやボールが壊れるときの色パレット（黄色、オレンジ、赤、紫、青、ピンク、灰色、ライム、スカイブルー）
+const BREAK_PALETTE = ["#fff000", "#ffa500", "#ff0000", "#800080", "#0000cd", "#ff1493", "#888", "lime", "#00FFFF"];
 // モードテキスト
 const MODE_TEXT = ["EASY", "NORMAL", "HARD", "CRAZY"];
 const MODE_HUE = [40, 55, 70, 85]
@@ -278,7 +278,8 @@ let sound_powerup;
 
 function preload(){
 	huiFont = loadFont("https://inaridarkfox4231.github.io/assets/HuiFont29.ttf");
-	const codeNames = ["C", "D", "E", "F", "G", "A", "B", "C2", "D2", "E2", "F2", "G2", "A2", "B2"];
+	const codeNames = ["C", "D", "E", "F", "G", "A", "B", "C2", "D2", "E2", "F2", "G2", "A2", "B2",
+                     "C3", "D3", "E3", "F3", "G3", "A3", "B3"];
 	for(let name of codeNames){
 		codes.push(loadSound("https://inaridarkfox4231.github.io/blockbreakSounds/code_" + name + ".wav"));
 	}
@@ -819,9 +820,14 @@ class GameSystem{
 	getOffSet(){
 		return {x:(CANVAS_W - this.gr.width) * 0.5, y:(CANVAS_H - this.gr.height) * 0.5};
 	}
+	outsideCheck(){
+		return this.ball.x < 0 || this.ball.x > this.gr.width || this.ball.y < 0 || this.ball.y > this.gr.height;
+	}
 	clickAction(){
 		// ボールがnonActive: activateしておわり。active:すべてのパドルをactivateする
 		if(this.currentPaddleId >= 0){
+			// ボールが画面外にいるときは反応させない
+			if(this.outsideCheck()){ return; }
 			this.paddles[this.currentPaddleId].removeBall();
 			this.ball.activate();
 			this.currentPaddleId = -1;
@@ -946,7 +952,8 @@ class GameSystem{
 		if(this.clearFlag){ return; } // クリア条件を満たしたら以降の処理はキャンセル
 		this.ball.update();
 		if(this.ball.isActive()){
-			if(this.gutter.check(this.ball)){
+			// ボールが画面外に出たら死ぬ仕様を追加
+			if(this.gutter.check(this.ball) || this.outsideCheck()){
 				// ボールがやられるときのパーティクルは6番以降の色を使う。三角形。
 				const p = this.getCollidePoint();
 				// 音を出すね
@@ -1351,7 +1358,7 @@ class Ball{
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0; // 240カウントごとにレベルが下がる
 		this.gr = createGraphics(this.radius * 2, this.radius * 2);
-		this.grList = createGraphics(this.radius * 4, this.radius * 2);
+		this.grList = createGraphics(this.radius * 6, this.radius * 2);
 		this.grList.colorMode(HSB, 100);
 		this.grList.noStroke();
 		this.prepareBallGraphics();
@@ -1366,6 +1373,10 @@ class Ball{
 		for(let i = 0; i < this.radius * 2; i++){
 			g.fill(25, 100 - i * 50 / this.radius, 100);
 			g.circle(this.radius * 3, this.radius, this.radius * 2 - i);
+		}
+		for(let i = 0; i < this.radius * 2; i++){
+			g.fill(50, 100 - i * 50 / this.radius, 100);
+			g.circle(this.radius * 5, this.radius, this.radius * 2 - i);
 		}
 	}
 	getLife(){
@@ -1410,9 +1421,9 @@ class Ball{
 	hitWithPaddle(_paddle){
 		// パドルがアクティブのときレベルアップ（ただし上限のときは反応無し）
 		if(!_paddle.isActive()){ return; }
-		if(this.level === 1){ return; }
+		if(this.level === 2){ return; }
 		this.level++;
-		this.poweredCount = 240;
+		this.poweredCount += 240;
 		myMusic.playPowerupSound();
 		this.setStatus();
 	}
@@ -1446,7 +1457,7 @@ class Ball{
 		} // 位置も方向もこっちでは決めない
 		if(this.poweredCount > 0){
 			this.poweredCount--;
-			if(this.poweredCount === 0){
+			if(this.poweredCount % 240 === 0){
 				this.level--;
 				this.setStatus();
 			}
@@ -1456,10 +1467,10 @@ class Ball{
 	}
 	drawAura(gr){
 		// オーラ描画
-		gr.stroke(25, 100, 100);
+		gr.stroke(25 * this.level, 100, 100); // 25又は50
 		gr.noFill();
 		gr.strokeWeight(2);
-		const barLength = this.poweredCount * Math.PI * 2 / 240;
+		const barLength = (this.poweredCount % 240) * Math.PI * 2 / 240;
 		gr.arc(this.x, this.y, this.radius * 4, this.radius * 4, -Math.PI / 2, -Math.PI / 2 + barLength);
 		gr.noStroke();
 	}
