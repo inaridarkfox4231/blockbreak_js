@@ -401,8 +401,8 @@ class Title extends State{
 		//this.level = 0;
 		this.stage = 0; // レベル廃止
 		this.mode = 0;
-		this.levelSpace = createGraphics(80 + 440, 40);
-		this.modeSpace = createGraphics(70 + 350, 40);
+		this.stageSpace = createGraphics(700, 220);
+		this.modeSpace = createGraphics(350, 40);
 		this.playButton = createGraphics(120, 60);
 		this.drawPrepare();
 		this.bg = createGraphics(CANVAS_W, CANVAS_H, WEBGL); // 背景
@@ -415,62 +415,59 @@ class Title extends State{
 		bgShader.setUniform("seed", [Math.random() * 99, Math.random() * 99]);
 		this.bg.quad(-1, -1, -1, 1, 1, 1, 1, -1);
 	}
-	drawNonActiveButton(gr, x, y, txt){
+	drawNonActiveButton(gr, x, y, w, h, txt){
 		gr.fill(50);
-		gr.triangle(x, y, x + 80, y, x, y + 40);
+		gr.triangle(x, y, x + w, y, x, y + h);
 		gr.fill(25);
-		gr.triangle(x + 80, y, x, y + 40, x + 80, y + 40);
+		gr.triangle(x + w, y, x, y + h, x + w, y + h);
 		gr.fill(75);
-		gr.rect(x + 8, y + 4, 64, 32);
+		gr.rect(x + w * 0.1, y + h * 0.1, w * 0.8, h * 0.8);
 		gr.fill(0);
-		gr.text(txt, x + 40, y + 20);
+		gr.text(txt, x + w * 0.5, y + h * 0.5);
 	}
-	drawActiveButton(gr, x, y, txt, hue){
+	drawActiveButton(gr, x, y, w, h, txt, hue){
 		gr.fill(hue, 50, 100);
-		gr.triangle(x, y, x + 80, y, x, y + 40);
+		gr.triangle(x, y, x + w, y, x, y + h);
 		gr.fill(hue, 100, 50);
-		gr.triangle(x + 80, y, x, y + 40, x + 80, y + 40);
+		gr.triangle(x + w, y, x, y + h, x + w, y + h);
 		gr.fill(hue, 100, 100);
-		gr.rect(x + 8, y + 4, 64, 32);
+		gr.rect(x + w * 0.1, y + h * 0.1, w * 0.8, h * 0.8);
 		gr.fill(0);
-		gr.text(txt, x + 40, y + 20);
+		gr.text(txt, x + w * 0.5, y + h * 0.5);
 	}
   drawPrepare(){
 		this.gr.textFont(huiFont);
 		this.gr.textAlign(CENTER, CENTER);
 		this.gr.fill(0);
-    ordinaryPrepare([this.levelSpace, this.modeSpace, this.playButton]);
-		this.drawLevelButtons();
+    ordinaryPrepare([this.stageSpace, this.modeSpace, this.playButton]);
+		this.drawStageButtons();
 		this.drawModeButtons();
 		this.drawPlayButton();
 	}
-	drawLevelButtons(){
-		this.levelSpace.clear();
-		for(let i = 0; i < 5; i++){
-			if(i === floor(this.stage / 5)){
-				this.drawActiveButton(this.levelSpace, 80 + 90 * i, 0, "Lv." + i, 20);
-			}else{
-				this.drawNonActiveButton(this.levelSpace, 80 + 90 * i, 0, "Lv." + i);
-			}
-		}
-		this.levelSpace.fill(255);
-		this.levelSpace.text("LEVEL:", 40 + 2, 20 + 2);
-		this.levelSpace.fill(0);
-		this.levelSpace.text("LEVEL:", 40, 20);
+	drawStageButtons(){
+		this.stageSpace.clear();
+		for(let z = 0; z < 3; z++){
+		  for(let x = 0; x < 5; x++){
+			  for(let y = 0; y < 5; y++){
+					let n = x + y * 5 + z * 25;
+				  if(this.stage === n){
+					  this.drawActiveButton(this.stageSpace, 45 * x + 240 * z, 45 * y, 40, 40, n, 20 + z * 15);
+				  }else{
+				  	this.drawNonActiveButton(this.stageSpace, 45 * x + 240 * z, 45 * y, 40, 40, n);
+				  }
+			  }
+		  }
+	  }
 	}
 	drawModeButtons(){
 		this.modeSpace.clear();
 		for(let i = 0; i < 4; i++){
 			if(i === this.mode){
-				this.drawActiveButton(this.modeSpace, 70 + 90 * i, 0, MODE_TEXT[i], MODE_HUE[i]);
+				this.drawActiveButton(this.modeSpace, 90 * i, 0, 80, 40, MODE_TEXT[i], MODE_HUE[i]);
 			}else{
-				this.drawNonActiveButton(this.modeSpace, 70 + 90 * i, 0, MODE_TEXT[i]);
+				this.drawNonActiveButton(this.modeSpace, 90 * i, 0, 80, 40, MODE_TEXT[i]);
 			}
 		}
-		this.modeSpace.fill(255);
-		this.modeSpace.text("MODE:", 35 + 2, 20 + 2);
-		this.modeSpace.fill(0);
-		this.modeSpace.text("MODE:", 35, 20);
 	}
 	drawPlayButton(){
 		this.playButton.textSize(48);
@@ -490,7 +487,7 @@ class Title extends State{
 		// this.level = 0;
 		this.stage = 0;
 		this.mode = 0;
-		this.drawLevelButtons();
+		this.drawStageButtons();
 		this.drawModeButtons();
 	}
   keyAction(code){
@@ -506,25 +503,31 @@ class Title extends State{
 		// プレイボタンの位置：340x505の120x60です。
 		const mx = mouseX;
 		const my = mouseY;
-		if(mx > 220 && mx < 660 && my > 300 && my < 340){
-			if((mx - 220) % 90 > 80){ return; }
-			const newStage = Math.floor((mx - 220) / 90) * 5; // そのうちね
+		if(mx > 50 && mx < 750 && my > 210 && my < 430){
+			if((my - 210) % 45 > 40){ return; }
+			if((mx - 50) % 240 > 220){ return; }
+			if(((mx - 50) % 240) % 45 > 40){ return; }
+			const z = Math.floor((mx - 50) / 240);
+			const x = Math.floor(((mx - 50) % 240) / 45);
+			const y = Math.floor((my - 210) / 45);
+			const newStage = x + y * 5 + z * 25;
+			if(newStage > STAGE_MAX){ return; }
 			if(newStage !== this.stage){
 				this.stage = newStage;
 				myMusic.playDecisionSound();
 			}
-			this.drawLevelButtons();
+			this.drawStageButtons();
 		}
-		if(mx > 260 && mx < 610 && my > 400 && my < 440){
-			if((mx - 260) % 90 > 80){ return; }
-			const newMode = Math.floor((mx - 260) / 90);
+		if(mx > 225 && mx < 575 && my > 450 && my < 490){
+			if((mx - 225) % 90 > 80){ return; }
+			const newMode = Math.floor((mx - 225) / 90);
 			if(newMode !== this.mode){
 				this.mode = newMode;
 				myMusic.playDecisionSound();
 			}
 			this.drawModeButtons();
 		}
-		if(mx > 340 && mx < 460 && my > 505 && my < 565){
+		if(mx > 340 && mx < 460 && my > 510 && my < 570){
 			this.setNextState("play");
 			myMusic.playDecisionSound();
 		}
@@ -534,17 +537,17 @@ class Title extends State{
 		this.gr.image(this.bg, 0, 0);
 		this.gr.fill(255);
 		this.gr.textSize(90);
-		this.gr.text("BLOCKBREAK", 400 + 2, 80 + 2);
+		this.gr.text("BLOCKBREAK", 400 + 2, 60 + 2);
 		this.gr.textSize(45);
-		this.gr.text("----CLICK PLAY BUTTON----", 402, 202);
+		this.gr.text("----CLICK PLAY BUTTON----", 402, 162);
 		this.gr.fill(0);
 		this.gr.textSize(90);
-		this.gr.text("BLOCKBREAK", 400, 80);
+		this.gr.text("BLOCKBREAK", 400, 60);
 		this.gr.textSize(45);
-		this.gr.text("----CLICK PLAY BUTTON----", 400, 200);
-		this.gr.image(this.levelSpace, 400 - 40 - 220, 320 - 20);
-		this.gr.image(this.modeSpace, 400 - 35 - 175, 420 - 20);
-		this.gr.image(this.playButton, 400 - 60, 520 - 15);
+		this.gr.text("----CLICK PLAY BUTTON----", 400, 160);
+		this.gr.image(this.stageSpace, 400 - 350, 210);
+		this.gr.image(this.modeSpace, 400 - 175, 450);
+		this.gr.image(this.playButton, 400 - 60, 510);
 		image(this.gr, 0, 0);
 	}
 }
