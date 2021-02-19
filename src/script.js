@@ -911,6 +911,13 @@ class GameSystem{
 					this.createBlockParticle(p, id, 20);
 				}
 				this.ball.hitWithBlock(b);
+				// ブロックがボールにより壊れるときにボールのattackが自身のtough+2以上なら
+				// ボールのpenetrateフラグを立てる、それが立ってるときは反射しない。そのあと戻す。
+				if(this.ball.getPenetrate()){
+					// 貫通の場合はここで抜ける
+					this.ball.setPenetrate(false);
+					break;
+				}
 				b.collider.reflect(this.ball); // ここで反射処理
 				break;
 			}
@@ -959,7 +966,10 @@ class GameSystem{
 		const offSet = this.getOffSet();
 		const mx = constrain((mouseX - offSet.x) / this.gr.width, 0, 1);
 		const my = constrain((mouseY - offSet.y) / this.gr.height, 0, 1);
-		for(let pdl of this.paddles){ pdl.move(mx, my); pdl.updateBall(); pdl.update(); }
+		let paddleParticlePosList = [];
+		for(let pdl of this.paddles){
+			pdl.move(mx, my); pdl.updateBall(); pdl.update();
+		}
 		if(this.ball.isActive()){
 			this.collideWithPaddles();
 			this.collideWithBlocks();
@@ -1087,7 +1097,7 @@ function createStage0(){
 }
 
 // 1.
-function createStage(){
+function createStage1(){
 	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	sys.setBlockGroup([11, 9, 11, 13, 7, 9, 13, 15], [5, 6, 6, 6, 7, 7, 7, 7],
@@ -1113,7 +1123,7 @@ function createStage2(){
 }
 
 // 3.
-function createStgae3(){
+function createStage3(){
 	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
 	//sys.setBlock(11, 4, 2, 1, LIFEUP, 1);
@@ -1419,6 +1429,7 @@ class Ball{
 		this.grList.noStroke();
 		this.prepareBallGraphics();
 		this.gr.image(this.grList, 0, 0);
+		this.penetrate = false; // trueのとき貫通。こっちのattackが向こうのtough+2以上。
 	}
 	prepareBallGraphics(){
 		let g = this.grList;
@@ -1447,6 +1458,12 @@ class Ball{
 	}
 	inActivate(){
 		this.active = false;
+	}
+	setPenetrate(flag){
+		this.penetrate = flag;
+	}
+	getPenetrate(){
+		return this.penetrate;
 	}
 	kill(){
 		//this.life--;
@@ -1481,6 +1498,7 @@ class Ball{
 		this.active = false;
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0;
+		this.penetrate = false;
 		// ゴーストを消すため一瞬だけ画面外に消えてもらう。よくある処理。一瞬なので問題ない。
 		this.x = -100;
 		this.y = -100;
@@ -1565,6 +1583,7 @@ class Paddle{
 		}
 	}
 	drawPointer(gr){
+		// いい加減矢印にしないとね。
 		if(this.ball === undefined){ return; }
 		gr.stroke(0, 0, 100);
 		gr.strokeWeight(2);
@@ -1721,6 +1740,9 @@ class Block{
 		// タフネス1でダメージも1でかつwもhもGRIDSIZEx2以上の大きさの時に限り分裂. NORMALでもLIFEUPでも。
 		// LIFEUPの場合は上手くすれば5UPできるというわけ
 		if(this.tough === 1 && _ball.attack === 1 && this.w > GRIDSIZE && this.h > GRIDSIZE){ this.hasChild = true; }
+		if(this.tough + 2 <= _ball.attack){
+			_ball.setPenetrate(true);
+		}
 		this.tough = max(0, this.tough - _ball.attack);
 		if(this.tough === 0){ this.kill(); return; }
 		// returnしないと実行されちゃうでしょこの馬鹿！！！！！！
@@ -2090,10 +2112,10 @@ class Particle{
 class ParticleSystem{
 	constructor(){
 		this.particleArray = new CrossReferenceArray();
-		this.directionRange = [0, 2 * PI]; // ここをいじると色んな方向にとびだす
+		//this.directionRange = [0, 2 * PI]; // ここをいじると色んな方向にとびだす
 		//this.lifeFactor = 1.0;
-		this.sizeFactor = 1.0;
-		this.hop = false; // particleが放物線を描くかどうか。デフォはまっすぐ。
+		//this.sizeFactor = 1.0;
+		//this.hop = false; // particleが放物線を描くかどうか。デフォはまっすぐ。
 		this.gr = undefined; // 画像
 	}
 	isEmpty(){
@@ -2105,26 +2127,14 @@ class ParticleSystem{
 		this.gr = createGraphics(w, h);
 		this.gr.noStroke();
 	}
-	createParticle(x, y, baseColor, drawFunction, particleNum){
+	createParticle(x, y, baseColor, drawFunction, particleNum, sizeFactor = 1.0, hopFlag = false, minDirection = 0, maxDirection = 2 * PI){
 		for(let i = 0; i < particleNum; i++){
 			let ptc = particlePool.use();
 			// 一応基本は[0, 2 * PI]で。特定方向に出す場合も考慮・・
-			const direction = random(this.directionRange[0], this.directionRange[1]);
-			ptc.initialize(x, y, direction, baseColor, drawFunction, this.sizeFactor, this.hop);
+			const direction = random(minDirection, maxDirection);
+			ptc.initialize(x, y, direction, baseColor, drawFunction, sizeFactor, this.hop);
 			this.particleArray.add(ptc);
 		}
-	}
-	setDirectionRange(rangeArray){
-		this.directionRange = rangeArray;
-		return this;
-	}
-	setSizeFactor(sizeFactor){
-		this.sizeFactor = sizeFactor;
-		return this;
-	}
-	setHop(flag){
-		this.hop = flag;
-		return this;
 	}
 	update(){
 		this.particleArray.loop("update");
