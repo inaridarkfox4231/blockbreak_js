@@ -669,12 +669,15 @@ class Pause extends State{
   prepare(_state){
 		this.gr.image(_state.gr, 0, 0);
 		this.gr.background(0, 128);
-		this.gr.text("---PAUSE---", CANVAS_W * 0.5, CANVAS_H * 0.46);
-		this.gr.text("PRESS SPACE KEY", CANVAS_W * 0.5, CANVAS_H * 0.54);
+		this.gr.text("---PAUSE---", CANVAS_W * 0.5, CANVAS_H * 0.38);
+		this.gr.text("TO PLAY: SPACE KEY", CANVAS_W * 0.5, CANVAS_H * 0.50);
+		this.gr.text("TO TITLE: ENTER KEY", CANVAS_W * 0.5, CANVAS_H * 0.62);
   }
   keyAction(code){
 		if(code === K_SPACE){
 			this.setNextState("play");
+		}else if(code === K_ENTER){
+			this.setNextState("title");
 		}
 	}
 	clickAction(){}
@@ -795,6 +798,9 @@ class GameSystem{
 		this.gr = createGraphics(w, h);
 		this.gr.noStroke();
 		this.gr.colorMode(HSB, 100);
+		this.gr.textAlign(LEFT, CENTER);
+		this.gr.textSize(30);
+		this.gr.textFont(huiFont);
 		this.particles.setGraphic(w, h);
 		this.blocks = [];
 		this.paddles = [];
@@ -810,14 +816,14 @@ class GameSystem{
 		}
 	}
 	setPattern(stage){
-		// levelとstageによりjsonからステージシードを引き出す：
-		// const seed = stageData["level" + level]["stage" + stage];
-		//this.level = level; // 描画用
 		this.stage = stage; // 描画用
 		// ボール
 		this.ball.initialize(); // ボールの初期化
+		// パーティクルが残っていれば全部空にする
+		if(!this.particles.isEmpty()){
+			this.particles.removeAll();
+		}
 		// パターンを用意する
-		//createStagePattern1();
 		window["createStage" + stage]();
     // ボールをパドルにセットする
 		this.paddles[0].setBall(this.ball);
@@ -1012,15 +1018,7 @@ class GameSystem{
 		// コンフィグパート
 		this.gr.fill(0, 0, 100);
 		// ステージ番号を描画
-		// スコアを描画
-		// ライフを描画
-		/*
-		for(let k = 0; k < this.ball.getLife(); k++){
-			let cx = 180 + 30 * (k % 10) + 15;
-			let cy = Math.floor(k / 10) * 30 + 15;
-			this.gr.circle(cx, cy, 25);
-		}
-		*/
+		this.gr.text("STAGE " + this.stage, 10, 25);
 	}
 }
 
@@ -1086,7 +1084,6 @@ function createStage0(){
 			sys.setBlock(x, y, 2, 1, NORMAL, 2);
 		}
 	}
-	//sys.setBlock(11, 5, 2, 1, LIFEUP, 1);
 }
 
 // 1.
@@ -1438,14 +1435,6 @@ class Ball{
 			g.circle(this.radius * 5, this.radius, this.radius * 2 - i);
 		}
 	}
-	/*
-	getLife(){
-		return this.life;
-	}
-	setLife(life){
-		this.life = life;
-	}
-	*/
 	isActive(){
 		return this.active;
 	}
@@ -1473,14 +1462,6 @@ class Ball{
 	hitWithBlock(_block){
 		// LIFEUPでライフ回復。まあそのくらい。
 		// ライフ無くなった。まあ、強制レベルアップの可能性あるし残しておこう。
-		/*
-		switch(_block.blockType){
-			case LIFEUP:
-			  this.life++;
-				if(this.life > 20){ this.life = 20; }
-				break;
-		}
-		*/
 	}
 	hitWithPaddle(_paddle){
 		// パドルがアクティブのときレベルアップ（ただし上限のときは反応無し）
@@ -1765,18 +1746,6 @@ class Block{
 		gr.fill(50);
 		gr.rect(1, 1, w - 2, h - 2);
 	}
-	/*
-	static drawHeart(gr, cx, cy){
-		gr.stroke(88, 20, 100);
-		gr.strokeWeight(8);
-		gr.line(cx, cy, cx - 4, cy - 4);
-		gr.line(cx, cy, cx + 4, cy - 4);
-		gr.noStroke();
-		gr.fill(88, 20, 100);
-		let l = 4 * Math.sqrt(2);
-		gr.quad(cx, cy - l, cx + l, cy, cx, cy + l, cx - l, cy);
-	}
-	*/
 }
 
 // RingWallはもう別に用意した方がいいと思う。で、当たり判定はブロックと一緒に用意する。
@@ -2088,10 +2057,13 @@ class Particle{
 		this.drawFunction = drawFunction;
 		this.hop = hopFlag;
 	}
+	kill(){
+		this.alive = false;
+	}
 	update(){
 		this.life--;
 		this.rotationAngle += PARTICLE_ROTATION_SPEED;
-		if(this.life === 0){ this.alive = false; }
+		if(this.life === 0){ this.kill(); }
 	}
 	draw(gr){
 		let prg = (PARTICLE_LIFE - this.life) / PARTICLE_LIFE;
@@ -2165,6 +2137,11 @@ class ParticleSystem{
 	}
 	remove(){
 		this.particleArray.loopReverse("remove");
+	}
+	removeAll(){
+		// 全部リセット
+		for(let p of this.particleArray){ p.kill(); }
+		this.remove();
 	}
 }
 
