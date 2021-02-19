@@ -1587,8 +1587,19 @@ class Paddle{
 		if(this.ball === undefined){ return; }
 		gr.stroke(0, 0, 100);
 		gr.strokeWeight(2);
-		gr.line(this.ball.x, this.ball.y,
-						this.ball.x + 40 * cos(this.ball.direction), this.ball.y + 40 * sin(this.ball.direction));
+		const d = this.ball.direction;
+		const c = cos(d);
+		const s = sin(d);
+		const {x, y} = this.ball;
+		const u = x + 40 * c;
+		const v = y + 40 * s;
+		const u1 = u + 10 * cos(d + PI * 5 / 6);
+		const v1 = v + 10 * sin(d + PI * 5 / 6);
+		const u2 = u + 10 * cos(d - PI * 5 / 6);
+		const v2 = v + 10 * sin(d - PI * 5 / 6);
+		gr.line(x + 10 * c, y + 10 * s, u, v);
+		gr.line(u, v, u1, v1);
+		gr.line(u, v, u2, v2);
 		gr.noStroke();
 	}
 }
