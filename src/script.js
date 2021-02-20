@@ -53,7 +53,7 @@ const WALL = 2;
 let particlePool;
 const EMPTY_SLOT = Object.freeze(Object.create(null)); // ダミーオブジェクト
 
-const PARTICLE_LIFE = 60; // 寿命
+const PARTICLE_LIFE = 45; // 寿命
 const PARTICLE_ROTATION_SPEED = 0.12; // 形状の回転スピード
 const MIN_DISTANCE = 30; // 到達距離
 const MAX_DISTANCE = 60;
@@ -864,6 +864,16 @@ class GameSystem{
 		// ボールのパーティクル
 		this.particles.createParticle(p.x, p.y, color(BREAK_PALETTE[6 + this.ball.level]), drawFunction, particleNum);
 	}
+	createMovingParticle(){
+		// ボールがレベル1か2のときに移動中のパーティクルを出す
+		// 個数はレベルで出現位置は後ろ
+		const lv = this.ball.getLevel();
+		if(lv < 1){ return; }
+		const {x, y, radius:r} = this.ball;
+		const d = this.ball.getDirection();
+		this.particles.createParticle(x - r * cos(d), y - r * sin(d), color(BREAK_PALETTE[6 + this.ball.level]),
+	                                drawSquare, lv, 0.35, false, d + Math.PI, d + Math.PI);
+	}
 	createBlockParticle(p, id, particleNum){
 		// ブロックのパーティクル
 		// のちに円形ブロック使うようになったらまた変わるかもだけどね。円形には当たると強制アクティベートの付加効果を持たせるつもり
@@ -877,9 +887,6 @@ class GameSystem{
 			case NORMAL:
 			  myMusic.playBlockSound(id + 7 * this.ball.level);
 				break;
-			//case LIFEUP:
-			//  myMusic.playBlockSound(5 + 7 * this.ball.level);
-			//	break;
 		}
 	}
 	getAdditionalBlocks(b){
@@ -962,7 +969,7 @@ class GameSystem{
 	update(){
 		this.particles.update(); // パーティクルのアップデート
 		this.particles.remove(); // パーティクルのリムーブ
-		if(!this.ball.isAlive()){ return; }
+		if(!this.ball.isAlive()){ return; } // ボールが死んだら以降の処理をキャンセル
 		const offSet = this.getOffSet();
 		const mx = constrain((mouseX - offSet.x) / this.gr.width, 0, 1);
 		const my = constrain((mouseY - offSet.y) / this.gr.height, 0, 1);
@@ -981,6 +988,8 @@ class GameSystem{
 		}
 		if(this.clearFlag){ return; } // クリア条件を満たしたら以降の処理はキャンセル
 		this.ball.update();
+		// ここで移動時パーティクル生成
+		this.createMovingParticle();
 		if(this.ball.isActive()){
 			// ボールが画面外に出たら死ぬ仕様を追加
 			if(this.gutter.check(this.ball) || this.outsideCheck()){
@@ -1480,6 +1489,12 @@ class Ball{
 	}
 	getPenetrate(){
 		return this.penetrate;
+	}
+	getLevel(){
+		return this.level;
+	}
+	getDirection(){
+		return this.direction;
 	}
 	kill(){
 		//this.life--;
