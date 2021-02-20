@@ -890,6 +890,7 @@ class Clear extends State{
 class GameSystem{
 	constructor(){
 		this.gr = undefined; // グラフィック
+		this.bg = undefined; // 背景
 		//this.score = 0; // スコア廃止
 		this.mode = 0;
 		this.gutter = new Gutter(); // ガター
@@ -917,6 +918,26 @@ class GameSystem{
 		this.particles.setGraphic(w, h);
 		this.blocks = [];
 		this.paddles = [];
+		this.createBackground(w, h);
+	}
+	createBackground(w, h){
+		this.bg = createGraphics(w, h);
+		this.bg.noStroke();
+		// 黒と青のグラデーション
+		let p;
+		for(let i = 0; i < 200; i++){
+			p = i / 200;
+			p = pow(p, 3);
+			this.bg.fill(40 * p, 49 * p, 153 * p);
+			this.bg.rect(0, i * h / 200, w, h / 200);
+		}
+		// 星を配置
+		let x, y;
+		for(let i = 0; i < 10; i++){
+			x = w * (0.1 + Math.random() * 0.8);
+			y = 60 + h * (0.1 + Math.random() * 0.3);
+		  drawStar(x, y, 2 + 3 * Math.random(), 0, color(255, 242, 0), this.bg);
+		}
 	}
 	setBlock(gridX, gridY, gridW, gridH, _type = WALL, tough = Infinity){
 		// ブロック設置用の簡易メソッド
@@ -1137,7 +1158,8 @@ class GameSystem{
 	}
 	draw(){
 		// 背景
-		this.gr.background(0);
+		this.gr.image(this.bg, 0, 0);
+		//this.gr.background(0);
 		// ブロック、パドル、ボール
 		for(let b of this.blocks){ b.draw(this.gr); }
 		for(let ring of this.ringWalls){ ring.draw(this.gr); }
