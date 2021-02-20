@@ -267,6 +267,110 @@ let fsTitle =
 "}";
 
 // ----------------------------------------------------------------------------------- //
+// playShader.
+let vsPlay =
+"precision mediump float;" +
+"attribute vec3 aPosition;" +
+"void main(void){" +
+"  gl_Position = vec4(aPosition, 1.0);" +
+"}";
+
+let fsPlay =
+"precision mediump float;" +
+"uniform vec2 u_resolution;" +
+"uniform float u_time;" +
+"uniform float u_hue;" +
+"const float pi = 3.14159;" +
+"const vec2 r_vec_20 = vec2(127.1, 311.7);" +
+"const vec2 r_vec_21 = vec2(269.5, 183.3);" +
+"const vec2 u_10 = vec2(1.0, 0.0);" +
+"const vec2 u_01 = vec2(0.0, 1.0);" +
+"const vec2 u_11 = vec2(1.0, 1.0);" +
+"const vec3 r_vec_30 = vec3(127.1, 311.7, 251.9);" +
+"const vec3 r_vec_31 = vec3(269.5, 183.3, 314.3);" +
+"const vec3 r_vec_32 = vec3(419.2, 371.9, 218.4);" +
+"const vec3 u_100 = vec3(1.0, 0.0, 0.0);" +
+"const vec3 u_010 = vec3(0.0, 1.0, 0.0);" +
+"const vec3 u_001 = vec3(0.0, 0.0, 1.0);" +
+"const vec3 u_110 = vec3(1.0, 1.0, 0.0);" +
+"const vec3 u_101 = vec3(1.0, 0.0, 1.0);" +
+"const vec3 u_011 = vec3(0.0, 1.0, 1.0);" +
+"const vec3 u_111 = vec3(1.0, 1.0, 1.0);" +
+"const float r_coeff = 43758.5453123;" +
+"const int octaves = 6;" +
+// 2Dランダムベクトル(-1.0～1.0)
+"vec2 random2(vec2 st){" +
+"  vec2 v;" +
+"  v.x = sin(dot(st, r_vec_20)) * r_coeff;" +
+"  v.y = sin(dot(st, r_vec_21)) * r_coeff;" +
+"  return -1.0 + 2.0 * fract(v);" +
+"}" +
+// 3Dランダムベクトル(-1.0～1.0)
+"vec3 random3(vec3 st){" +
+"  vec3 v;" +
+"  v.x = sin(dot(st, r_vec_30)) * r_coeff;" +
+"  v.y = sin(dot(st, r_vec_31)) * r_coeff;" +
+"  v.z = sin(dot(st, r_vec_32)) * r_coeff;" +
+"  return -1.0 + 2.0 * fract(v);" + // -1.0～1.0に正規化
+"}" +
+"float snoise3(vec3 st){" +
+"  vec3 p = st + (st.x + st.y + st.z) / 3.0;" +
+"  vec3 f = fract(p);" +
+"  vec3 i = floor(p);" +
+"  vec3 g0, g1, g2, g3;" +
+"  vec4 wt;" +
+"  g0 = i;" +
+"  g3 = i + u_111;" +
+"  if(f.x >= f.y && f.x >= f.z){" +
+"    g1 = i + u_100;" +
+"    g2 = i + (f.y >= f.z ? u_110 : u_101);" +
+"    wt = (f.y >= f.z ? vec4(1.0 - f.x, f.x - f.y, f.y - f.z, f.z) : vec4(1.0 - f.x, f.x - f.z, f.z - f.y, f.y));" +
+"  }else if(f.y >= f.x && f.y >= f.z){" +
+"    g1 = i + u_010;" +
+"    g2 = i + (f.x >= f.z ? u_110 : u_011);" +
+"    wt = (f.x >= f.z ? vec4(1.0 - f.y, f.y - f.x, f.x - f.z, f.z) : vec4(1.0 - f.y, f.y - f.z, f.z - f.x, f.x));" +
+"  }else{" +
+"    g1 = i + u_001;" +
+"    g2 = i + (f.x >= f.y ? u_101 : u_011);" +
+"    wt = (f.x >= f.y ? vec4(1.0 - f.z, f.z - f.x, f.x - f.y, f.y) : vec4(1.0 - f.z, f.z - f.y, f.y - f.x, f.x));" +
+"  }" +
+"  float value = 0.0;" +
+"  wt = wt * wt * wt * (wt * (wt * 6.0 - 15.0) + 10.0);" +
+"  value += wt.x * dot(p - g0, random3(g0));" +
+"  value += wt.y * dot(p - g1, random3(g1));" +
+"  value += wt.z * dot(p - g2, random3(g2));" +
+"  value += wt.w * dot(p - g3, random3(g3));" +
+"  return value;" +
+"}" +
+// fbm
+"float fbm(vec3 st){" +
+"  float value = 0.0;" +
+"  float amplitude = 0.5;" +
+"  for(int i = 0; i < octaves; i++){" +
+"    value += amplitude * snoise3(st);" +
+"    st *= 2.0;" +
+"    amplitude *= 0.5;" +
+"  }" +
+"  return value;" +
+"}" +
+// hsbで書かれた(0.0～1.0)の数値vec3をrgbに変換する魔法のコード
+"vec3 getHSB(float r, float g, float b){" +
+"    vec3 c = vec3(r, g, b);" +
+"    vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);" +
+"    rgb = rgb * rgb * (3.0 - 2.0 * rgb);" +
+"    return c.z * mix(vec3(1.0), rgb, c.y);" +
+"}" +
+"void main(void){" +
+"  vec2 st = gl_FragCoord.xy * 0.5 / min(u_resolution.x, u_resolution.y);" +
+"  vec2 p = (st + vec2(0.05, 0.09) * u_time) * 3.0;" +
+"  float n = 0.5 + 0.5 * fbm(vec3(p, u_time * 0.05));" + // ノイズ計算
+"  vec3 cloudColor = vec3(1.0);" +
+"  vec3 skyColor = getHSB(u_hue, sqrt(st.y * (2.0 - st.y)), 0.5);" +
+"  vec3 finalColor = skyColor + (cloudColor - skyColor) * smoothstep(0.44, 0.56, n);" +
+"  gl_FragColor = vec4(finalColor, 1.0);" +
+"}";
+
+// ----------------------------------------------------------------------------------- //
 // sound関連.
 let myMusic;
 let codes = [];
@@ -580,6 +684,9 @@ class Play extends State{
 		this.offSet = {}; // ゲームシステム側のグラフィックを表示する際のオフセット
 		this.preAnimationSpan = 60;
 		this.drawPrepare();
+		this.bg = createGraphics(CANVAS_W, CANVAS_H, WEBGL);
+		this.bgShader = this.bg.createShader(vsPlay, fsPlay);
+		this.bg.shader(this.bgShader);
 	}
 	drawPrepare(){
 		this.gr.noStroke();
@@ -587,17 +694,22 @@ class Play extends State{
 		this.gr.textAlign(CENTER, CENTER);
 		this.gr.textFont(huiFont);
 	}
+	bgPrepare(){
+		this.bgShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
+		this.bgShader.setUniform("u_time", Math.floor(Math.random() * 999));
+		this.bgShader.setUniform("u_hue", Math.random()); // hueはもうランダムで
+		this.bg.quad(-1, -1, -1, 1, 1, 1, 1, -1);
+	}
   prepare(_state){
 		switch(_state.name){
 			case "pause":
 			  return;
 			case "title":
 			  this.gameSystem.initialize(_state.mode); // 1を引くって感じで。mode（難易度）設定。
-				this.stage = _state.stage; // 0, 5, 10, 15ですねー
-				//this.level = _state.level; // レベル番号要るかな・・んー
-				//this.stage = 0; // ステージ番号リセット
+				this.stage = _state.stage;
 				break;
 		}
+		this.bgPrepare();
 		this.gameSystem.setPattern(this.stage); // レベルとステージは両方必要
 		this.offSet = this.gameSystem.getOffSet(); // オフセットを計算する
 
@@ -648,7 +760,8 @@ class Play extends State{
 			return;
 		}
 		this.gameSystem.draw(); // システム側のdraw.
-		this.gr.background(128);
+		//this.gr.background(128);
+		this.gr.image(this.bg, 0, 0);
 		this.gr.image(this.gameSystem.gr, this.offSet.x, this.offSet.y);
 		image(this.gr, 0, 0);
 	}
