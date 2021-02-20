@@ -1433,6 +1433,34 @@ class Ball{
 	}
 	prepareBallGraphics(){
 		let g = this.grList;
+		const r = this.radius;
+		/*
+		g.colorMode(HSB, 100);
+		g.noFill();
+		g.translate(r, r);
+		for(let x = 0; x < 3; x++){
+			g.translate(2 * r, 0);
+			for(let s = r; s > 0; s--){
+				switch(x){
+					case 0:
+					  g.stroke(50 + 50 - s * 50 / r); break;
+					case 1:
+					  g.stroke(25, s * 100 / r, 100); break;
+					case 2:
+					  g.stroke(50, s * 100 / r, 100); break;
+				}
+				g.beginShape();
+				g.curveVertex(0, s);
+				for(let t = 0; t <= 10 * Math.PI;t += 0.5){
+			    let a = s * (6.5 + 1.5 * cos(t)) / r;
+			    curveVertex(a * cos(t / 5), a * sin(t / 5));
+			  }
+				g.curveVertex(0, s);
+				g.endShape();
+			}
+		}
+		*/
+
 		for(let i = 0; i < this.radius * 2; i++){
 			g.fill(50 + i * 25 / this.radius);
 			g.circle(this.radius, this.radius, this.radius * 2 - i);
@@ -1445,6 +1473,7 @@ class Ball{
 			g.fill(50, 100 - i * 50 / this.radius, 100);
 			g.circle(this.radius * 5, this.radius, this.radius * 2 - i);
 		}
+		
 	}
 	isActive(){
 		return this.active;
