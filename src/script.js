@@ -26,7 +26,7 @@ const K_SPACE = 32;
 // ライフ
 //const LIFES = [3, 5, 10, 15];
 // ステータス
-const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3]};
+const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3], rotationSpeed:[0.1, 0.15, 0.175]};
 // パドル長
 const PADDLE_LENGTH = [80, 60, 40, 30];
 // ブロックヒュー
@@ -1424,12 +1424,15 @@ class Ball{
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0; // 240カウントごとにレベルが下がる
 		this.gr = createGraphics(this.radius * 2, this.radius * 2);
+		// 先に中心においておく
+		this.gr.translate(this.radius, this.radius);
 		this.grList = createGraphics(this.radius * 6, this.radius * 2);
 		this.grList.colorMode(HSB, 100);
 		this.grList.noStroke();
 		this.prepareBallGraphics();
-		this.gr.image(this.grList, 0, 0);
+		this.gr.image(this.grList, -this.radius, -this.radius);
 		this.penetrate = false; // trueのとき貫通。こっちのattackが向こうのtough+2以上。
+		this.rotationSpeed = 0.1;
 	}
 	prepareBallGraphics(){
 		let g = this.grList;
@@ -1448,12 +1451,12 @@ class Ball{
 					  g.stroke(50, s * 100 / r, 100); break;
 				}
 				g.beginShape();
-				g.curveVertex(s, 0);
+				g.curveVertex(0, -s);
 				for(let t = 0; t <= 10; t += 0.2){
 			    let a = s * (0.8 + 0.2 * cos(t * Math.PI));
-			    g.curveVertex(a * cos(t * Math.PI / 5), a * sin(t * Math.PI / 5));
+			    g.curveVertex(a * sin(t * Math.PI / 5), -a * cos(t * Math.PI / 5));
 			  }
-				g.curveVertex(s, 0);
+				g.curveVertex(0, -s);
 				g.endShape();
 			}
 			g.translate(2 * r, 0);
@@ -1485,9 +1488,7 @@ class Ball{
 	setStatus(){
 		this.speed = STATUS.speed[this.level];
 		this.attack = STATUS.attack[this.level];
-		const diam = this.radius * 2;
-		this.gr.clear();
-		this.gr.image(this.grList, 0, 0, diam, diam, diam * this.level, 0, diam, diam);
+		this.rotationSpeed = STATUS.rotationSpeed[this.level];
 	}
 	hitWithBlock(_block){
 		// LIFEUPでライフ回復。まあそのくらい。
@@ -1507,11 +1508,14 @@ class Ball{
 		// 最終的にはガターにぶつかってパーティクルが出てそれが済んでからこれをやる。
 		this.alive = true;
 		this.level = 0;
+		this.gr.resetMatrix();
+		this.gr.translate(this.radius, this.radius);
 		this.setStatus();
 		this.active = false;
 		this.nonActiveFrameCount = 0;
 		this.poweredCount = 0;
 		this.penetrate = false;
+		this.rotationSpeed = 0.1;
 		// ゴーストを消すため一瞬だけ画面外に消えてもらう。よくある処理。一瞬なので問題ない。
 		this.x = -100;
 		this.y = -100;
@@ -1540,6 +1544,7 @@ class Ball{
 		}
 		this.x += this.speed * cos(this.direction);
 		this.y += this.speed * sin(this.direction);
+		this.gr.rotate(this.rotationSpeed); // 回転スピードにより画像のrotateを行う
 	}
 	drawAura(gr){
 		// オーラ描画
@@ -1551,6 +1556,10 @@ class Ball{
 		gr.noStroke();
 	}
 	draw(gr){
+		// 画像は毎フレームListから引き出してきて描画する感じ
+		const diam = this.radius * 2;
+		this.gr.clear();
+		this.gr.image(this.grList, -this.radius, -this.radius, diam, diam, diam * this.level, 0, diam, diam);
 		gr.image(this.gr, this.x - this.radius, this.y - this.radius);
 		if(this.level > 0){
       this.drawAura(gr);
