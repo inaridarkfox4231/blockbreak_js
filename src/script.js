@@ -1865,6 +1865,8 @@ class ArcPaddle extends Paddle{
 
 // ----------------------------------------------------------------------------------- //
 // block.
+// 種類を増やすなら継承使わないといけないかも。
+// 斜めのブロック導入するならどうしてもね・・まあ導入しないなら関係ないか。やめよう。時間ねぇし。
 
 // NORMALとLIFEUPとWALL. まあとりあえずWALLかな
 // さすがにもうグラフィックでいいかなって気がしてきた。多くなるとどうしてもね。
@@ -2034,6 +2036,10 @@ class Gutter{
 	}
 }
 
+// ----------------------------------------------------------------------------------- //
+// Collider.
+// コリダーのアークを廃止してskewrectを導入してパドルもskewパドルにしてアークパドル廃止する流れ。
+
 // collideの処理は現在の位置に速度を足したものについて行なう。そこだけ注意。
 class Collider{
 	constructor(){
@@ -2089,7 +2095,47 @@ class RectCollider extends Collider{
 	}
 }
 
+// 斜めrectのCollider.
+// cx,cyは中心、directionは方向、wはdirection方向の長さ、hはdirectionを時計回り90°回転させた方向の長さ。
+// あえて半分にはしない・・パドルに使うこと考えるとね。
+class SkewRectCollider extends Collider{
+	constructor(cx, cy, w, h, direction){
+		super();
+		this.cx = cx;
+		this.cy = cy;
+		this.w = w;
+		this.h = h;
+		this.direction = dir;
+	}
+	update(cx, cy, direction){
+		this.cx = cx;
+		this.cy = cy;
+		this.direction = direction;
+	}
+	CollideWithBall(_ball, post = true){
+		// ボールをこっちのdirectionに平行な正方形とみなして衝突判定する
+		// postは速度を足すかどうかって話。ガターでは足さないので。
+		const d = _ball.direction;
+		const r = _ball.radius;
+		const coeff = (post ? 1 : 0);
+		const bx = _ball.x + coeff * _ball.speed * cos(d);
+		const by = _ball.y + coeff * _ball.speed * sin(d);
+		const bx1 = bx - this.cx;
+		const by1 = by - this.cy;
+		const dir = this.direction;
+		const u = bx1 * Math.cos(dir) + by1 * Math.sin(dir);
+		const v = -bx1 * Math.sin(dir) + by1 * Math.cos(dir);
+		if(this.w * 0.5 < u - r || u + r < this.w * 0.5){ return false; }
+		if(this.h * 0.5 < v - r || v + r < this.h * 0.5){ return false; }
+		return true;
+	}
+	reflect(_ball){
+		// ぶつかる場合は速度を変える
+	}
+}
+
 // 厚みが必要。バームクーヘン的な。パドル専用。厚みは4で固定・・んー。
+// なくす。まあ、うん、なくす。
 class ArcCollider extends Collider{
   constructor(cx, cy, r, w){
 		super();
@@ -2166,14 +2212,6 @@ class RingCollider extends Collider{
 		let n = p5.Vector.fromAngle(ballDir);
 		let u = p5.Vector.sub(v, p5.Vector.mult(n, 2 * p5.Vector.dot(v, n)));
 		_ball.setDirection(u.heading());
-	}
-}
-
-// 円タイプのブロックも今後使っていきたい。円は緑系統の色で。
-class CircleCollider extends Collider{
-	constructor(){
-		super();
-		this.type = "circle";
 	}
 }
 

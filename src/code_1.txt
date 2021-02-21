@@ -1,6 +1,8 @@
 // 暇あったらこれ解析して！！
 // バーテックスシェーダ使いこなしたいので
 
+// こっちも解析よろしく！
+
 const vert =
 `
 attribute vec3 aPosition;
