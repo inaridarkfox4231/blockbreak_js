@@ -174,14 +174,14 @@ const fsLava =
 // ----------------------------------------------------------------------------------- //
 // titleShader.
 
-let vsTitle =
+let vsBG =
 "precision mediump float;" +
 "attribute vec3 aPosition;" +
 "void main(void){" +
 "  gl_Position = vec4(aPosition, 1.0);" +
 "}";
 
-let fsTitle =
+let fsBG =
 "precision mediump float;" +
 "uniform vec2 u_resolution;" +
 "uniform vec2 u_seed;" +
@@ -272,109 +272,42 @@ let fsTitle =
 "}";
 
 // ----------------------------------------------------------------------------------- //
-// playShader.
-let vsPlay =
+// さてと。トランジション。難しくないんだけど・・めんどくさいだけで。
+// タイトル画像と次に表示する画像を両方読み込み、初めの30フレームは両方表示、次の60フレームは2番目だけ表示、その次の30フレームで
+// 次の表示画面と・・って感じ。
+
+let vsTrans =
 "precision mediump float;" +
 "attribute vec3 aPosition;" +
 "void main(void){" +
 "  gl_Position = vec4(aPosition, 1.0);" +
 "}";
 
-let fsPlay =
+// 横長の長方形の中心から両サイドに広がるパターンを使う
+// 広がり切った時img2となるようにする。
+// 逆バージョンは収縮、縮まり切った時img2となるようにする。
+// やることはピクセルごとに0か1を取得してそれを使うだけ。
+let fsTrans =
 "precision mediump float;" +
 "uniform vec2 u_resolution;" +
-"uniform float u_time;" +
-"uniform float u_hue;" +
-"const float pi = 3.14159;" +
-"const vec2 r_vec_20 = vec2(127.1, 311.7);" +
-"const vec2 r_vec_21 = vec2(269.5, 183.3);" +
-"const vec2 u_10 = vec2(1.0, 0.0);" +
-"const vec2 u_01 = vec2(0.0, 1.0);" +
-"const vec2 u_11 = vec2(1.0, 1.0);" +
-"const vec3 r_vec_30 = vec3(127.1, 311.7, 251.9);" +
-"const vec3 r_vec_31 = vec3(269.5, 183.3, 314.3);" +
-"const vec3 r_vec_32 = vec3(419.2, 371.9, 218.4);" +
-"const vec3 u_100 = vec3(1.0, 0.0, 0.0);" +
-"const vec3 u_010 = vec3(0.0, 1.0, 0.0);" +
-"const vec3 u_001 = vec3(0.0, 0.0, 1.0);" +
-"const vec3 u_110 = vec3(1.0, 1.0, 0.0);" +
-"const vec3 u_101 = vec3(1.0, 0.0, 1.0);" +
-"const vec3 u_011 = vec3(0.0, 1.0, 1.0);" +
-"const vec3 u_111 = vec3(1.0, 1.0, 1.0);" +
-"const float r_coeff = 43758.5453123;" +
-"const int octaves = 6;" +
-// 2Dランダムベクトル(-1.0～1.0)
-"vec2 random2(vec2 st){" +
-"  vec2 v;" +
-"  v.x = sin(dot(st, r_vec_20)) * r_coeff;" +
-"  v.y = sin(dot(st, r_vec_21)) * r_coeff;" +
-"  return -1.0 + 2.0 * fract(v);" +
-"}" +
-// 3Dランダムベクトル(-1.0～1.0)
-"vec3 random3(vec3 st){" +
-"  vec3 v;" +
-"  v.x = sin(dot(st, r_vec_30)) * r_coeff;" +
-"  v.y = sin(dot(st, r_vec_31)) * r_coeff;" +
-"  v.z = sin(dot(st, r_vec_32)) * r_coeff;" +
-"  return -1.0 + 2.0 * fract(v);" + // -1.0～1.0に正規化
-"}" +
-"float snoise3(vec3 st){" +
-"  vec3 p = st + (st.x + st.y + st.z) / 3.0;" +
-"  vec3 f = fract(p);" +
-"  vec3 i = floor(p);" +
-"  vec3 g0, g1, g2, g3;" +
-"  vec4 wt;" +
-"  g0 = i;" +
-"  g3 = i + u_111;" +
-"  if(f.x >= f.y && f.x >= f.z){" +
-"    g1 = i + u_100;" +
-"    g2 = i + (f.y >= f.z ? u_110 : u_101);" +
-"    wt = (f.y >= f.z ? vec4(1.0 - f.x, f.x - f.y, f.y - f.z, f.z) : vec4(1.0 - f.x, f.x - f.z, f.z - f.y, f.y));" +
-"  }else if(f.y >= f.x && f.y >= f.z){" +
-"    g1 = i + u_010;" +
-"    g2 = i + (f.x >= f.z ? u_110 : u_011);" +
-"    wt = (f.x >= f.z ? vec4(1.0 - f.y, f.y - f.x, f.x - f.z, f.z) : vec4(1.0 - f.y, f.y - f.z, f.z - f.x, f.x));" +
-"  }else{" +
-"    g1 = i + u_001;" +
-"    g2 = i + (f.x >= f.y ? u_101 : u_011);" +
-"    wt = (f.x >= f.y ? vec4(1.0 - f.z, f.z - f.x, f.x - f.y, f.y) : vec4(1.0 - f.z, f.z - f.y, f.y - f.x, f.x));" +
-"  }" +
-"  float value = 0.0;" +
-"  wt = wt * wt * wt * (wt * (wt * 6.0 - 15.0) + 10.0);" +
-"  value += wt.x * dot(p - g0, random3(g0));" +
-"  value += wt.y * dot(p - g1, random3(g1));" +
-"  value += wt.z * dot(p - g2, random3(g2));" +
-"  value += wt.w * dot(p - g3, random3(g3));" +
-"  return value;" +
-"}" +
-// fbm
-"float fbm(vec3 st){" +
-"  float value = 0.0;" +
-"  float amplitude = 0.5;" +
-"  for(int i = 0; i < octaves; i++){" +
-"    value += amplitude * snoise3(st);" +
-"    st *= 2.0;" +
-"    amplitude *= 0.5;" +
-"  }" +
-"  return value;" +
-"}" +
-// hsbで書かれた(0.0～1.0)の数値vec3をrgbに変換する魔法のコード
-"vec3 getHSB(float r, float g, float b){" +
-"    vec3 c = vec3(r, g, b);" +
-"    vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);" +
-"    rgb = rgb * rgb * (3.0 - 2.0 * rgb);" +
-"    return c.z * mix(vec3(1.0), rgb, c.y);" +
-"}" +
+"uniform sampler2D u_img1;" +
+"uniform sampler2D u_img2;" +
+"uniform float u_prg;" +
+// prg:0～1. 0で棒、1でぴっちり、0.3で細い棒、0.7で太い棒。以上。
 "void main(void){" +
-"  vec2 st = gl_FragCoord.xy * 0.5 / min(u_resolution.x, u_resolution.y);" +
-"  vec2 p = (st + vec2(0.05, 0.09) * u_time) * 3.0;" +
-"  float n = 0.5 + 0.5 * fbm(vec3(p, u_time * 0.05));" + // ノイズ計算
-"  vec3 cloudColor = vec3(1.0);" +
-"  vec3 skyColor = getHSB(u_hue, sqrt(st.y * (2.0 - st.y)), 0.5);" +
-"  vec3 finalColor = skyColor + (cloudColor - skyColor) * smoothstep(0.44, 0.56, n);" +
-"  gl_FragColor = vec4(finalColor, 1.0);" +
+"  vec2 p = gl_FragCoord.xy * 0.5 / min(u_resolution.x, u_resolution.y);" + // レンガ分割用
+"  vec2 uv = gl_FragCoord.xy * 0.5 / u_resolution.xy;" + // 0~1x0~1.
+"  uv.y = 1.0 - uv.y;" + // 上下が逆になってるので修正
+"  vec4 tex1 = texture2D(u_img1, uv);" +
+"  vec4 tex2 = texture2D(u_img2, uv);" +
+"  vec2 q = p * 20.0 + vec2(0.3, 0.4);" +
+"  if(fract(0.5 * q.y) > 0.5){ q.x += 1.0; }" +
+"  vec2 q1 = vec2(fract(q.x * 0.5), fract(q.y));" + // q1はグリッドごとに(0~1)x(0~1)となっている
+// prgの値に対してpのところが0か1かという、のを、調べる。
+"  float coeff = (u_prg > abs(q1.x - 0.5) / 0.5 ? 0.0 : 1.0);" +
+"  vec4 col = coeff * tex1 + (1.0 - coeff) * tex2;" +
+"  gl_FragColor = col;" +
 "}";
-
 // ----------------------------------------------------------------------------------- //
 // sound関連.
 let myMusic;
@@ -515,7 +448,7 @@ class Title extends State{
 		this.playButton = createGraphics(120, 60);
 		this.drawPrepare();
 		this.bg = createGraphics(CANVAS_W, CANVAS_H, WEBGL); // 背景
-		this.bgShader = this.bg.createShader(vsTitle, fsTitle);
+		this.bgShader = this.bg.createShader(vsBG, fsBG);
 		this.bg.shader(this.bgShader);
 		this.drawBackground();
 	}
@@ -683,6 +616,10 @@ function ordinaryPrepare(graphics){
 // クリアにステージ番号だけは持たせる。5だったらオールクリア。
 // offsetね
 // ああ、pauseから来る場合は何もしないのよ・・忘れてた。
+// スタート前30フレーム、preImageと透明画像でやる必要があるかな。それを30フレーム、postAnimationSpan = 30とでもして、
+// その間は前フレームの画像とopeningImageの画像をopeningImageの画像と透明の画像（ていうかすべて0.0）で置き換えたものを
+// 最初にかませる。そのためのグラフィックをWEBGLで用意してimageで貼り付けるのは、それ。以上。
+// 30と60でやる
 class Play extends State{
 	constructor(_node){
 		super(_node);
@@ -691,23 +628,31 @@ class Play extends State{
 		//this.level = 0;
 		this.stage = 0;
 		this.offSet = {}; // ゲームシステム側のグラフィックを表示する際のオフセット
-		this.preAnimationSpan = 60;
-		this.drawPrepare();
+		this.openingAnimationSpan = 90;
+		this.postAnimationSpan = 30;
 		this.bg = createGraphics(CANVAS_W, CANVAS_H, WEBGL);
-		this.bgShader = this.bg.createShader(vsTitle, fsTitle);
+		this.bgShader = this.bg.createShader(vsBG, fsBG);
 		this.bg.shader(this.bgShader);
-	}
-	drawPrepare(){
-		this.gr.noStroke();
-		this.gr.textSize(64);
-		this.gr.textAlign(CENTER, CENTER);
-		this.gr.textFont(huiFont);
+		this.openingImage = createGraphics(CANVAS_W, CANVAS_H); // ステージ番号のみ表示
+		this.openingImage.noStroke();
+		this.openingImage.textSize(64);
+		this.openingImage.textAlign(CENTER, CENTER);
+		this.openingImage.textFont(huiFont);
+		this.openingImage.fill(255);
+		this.preImage = createGraphics(CANVAS_W, CANVAS_H); // 前stateの画像が必要ってわけで。タイトルだったりクリアのそれだったり
+		this.transImage = createGraphics(CANVAS_W, CANVAS_H, WEBGL); // これがopening及びプレイスタート後30フレームで使う画像
+		this.transShader = this.transImage.createShader(vsTrans, fsTrans);
+		this.transImage.shader(this.transShader);
 	}
 	bgPrepare(){
 		this.bgShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
 		this.bgShader.setUniform("u_seed", [Math.random() * 99, Math.random() * 99]);
 		this.bgShader.setUniform("u_blockColor", uniformize(random(BGCOLOR))); // ランダムチョイス
 		this.bg.quad(-1, -1, -1, 1, 1, 1, 1, -1);
+	}
+	openingImagePrepare(){
+		this.openingImage.background(0);
+		this.openingImage.text("STAGE " + this.stage, CANVAS_W * 0.5, CANVAS_H * 0.5);
 	}
   prepare(_state){
 		switch(_state.name){
@@ -719,13 +664,17 @@ class Play extends State{
 				break;
 		}
 		this.bgPrepare();
+		this.openingImagePrepare(); // タイトルからくるにせよクリアからにせよ必要
+		this.preImage.clear();
+		this.preImage.image(_state.gr, 0, 0); // 前のstateのgrを貼り付ける
 		this.gameSystem.setPattern(this.stage); // レベルとステージは両方必要
 		this.offSet = this.gameSystem.getOffSet(); // オフセットを計算する
 
-		this.preAnimationSpan = 60; // 0になるまでいろいろキャンセルしてステージ番号を表示
+		this.openingAnimationSpan = 90; // 0になるまでいろいろキャンセルしてステージ番号を表示
+		this.postAnimationSpan = 30; // アニメ終わってからプレイ画面になる、そのあと30フレームはアニメーションする
   }
   keyAction(code){
-		if(this.preAnimationSpan > 0){ return; } // プレアニメ中はポーズ禁止
+		if(this.openingAnimationSpan > 0){ return; } // プレアニメ中はポーズ禁止
 		// シフトキーでボールの位置が変わるかも
 		// スペースキーでポーズ
 		if(code === K_SPACE){
@@ -733,14 +682,15 @@ class Play extends State{
 		}
 	}
 	clickAction(){
-		if(this.preAnimationSpan > 0){ return; } // プレアニメ中はクリック禁止
+		if(this.openingAnimationSpan > 0){ return; } // プレアニメ中はクリック禁止
 		this.gameSystem.clickAction();
 	}
 	update(){
-		if(this.preAnimationSpan > 0){
-			this.preAnimationSpan--;
+		if(this.openingAnimationSpan > 0){
+			this.openingAnimationSpan--;
 			return;
 		}
+		if(this.postAnimationSpan > 0){ this.postAnimationSpan--; }
 
 		this.gameSystem.update();
 
@@ -757,22 +707,42 @@ class Play extends State{
 			this.setNextState("clear");
 		}
 	}
-	showPreAnimation(){
-		this.gr.background(0);
-		this.gr.fill(255);
-		this.gr.text("STAGE " + this.stage, CANVAS_W * 0.5, CANVAS_H * 0.5);
-		image(this.gr, 0, 0);
+	drawTrans(img1, img2, prg){
+		// prgが0のときimg1で1のときimg2なので間違えないでね。1-prgで逆回転。
+		this.transShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
+		this.transShader.setUniform("u_prg", prg);
+		this.transShader.setUniform("u_img1", img1);
+		this.transShader.setUniform("u_img2", img2);
+		this.transImage.quad(-1, -1, -1, 1, 1, 1, 1, -1);
+	}
+	showOpeningAnimation(){
+		// ここ。
+		/*
+		this.transShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
+		this.transShader.setUniform("u_prg", min(30, 90 - this.openingAnimationSpan) / 30);
+		this.transShader.setUniform("u_img1", this.preImage);
+		this.transShader.setUniform("u_img2", this.openingImage);
+		this.transImage.quad(-1, -1, -1, 1, 1, 1, 1, -1);
+		*/
+		this.drawTrans(this.preImage, this.openingImage, min(30, 90 - this.openingAnimationSpan) / 30);
+		image(this.transImage, 0, 0);
 	}
 	draw(){
-		if(this.preAnimationSpan > 0){
-			this.showPreAnimation();
+		if(this.openingAnimationSpan > 0){
+			this.showOpeningAnimation();
 			return;
 		}
 		this.gameSystem.draw(); // システム側のdraw.
 		//this.gr.background(128);
 		this.gr.image(this.bg, 0, 0);
 		this.gr.image(this.gameSystem.gr, this.offSet.x, this.offSet.y);
-		image(this.gr, 0, 0);
+		// じゃあここで
+		if(this.postAnimationSpan > 0){
+			this.drawTrans(this.gr, this.openingImage, this.postAnimationSpan / 30);
+			image(this.transImage, 0, 0);
+		}else{
+			image(this.gr, 0, 0);
+		}
 	}
 }
 
