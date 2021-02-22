@@ -35,7 +35,12 @@ const BLOCK_HUE = [18, 10, 0, 78, 65];
 const BREAK_PALETTE = ["#fff000", "#ffa500", "#ff0000", "#800080", "#0000cd", "#ff1493", "#888", "lime", "#00FFFF"];
 // モードテキスト
 const MODE_TEXT = ["EASY", "NORMAL", "HARD", "CRAZY"];
-const MODE_HUE = [40, 55, 70, 85]
+const MODE_HUE = [40, 55, 70, 85];
+
+// レンガ背景の色
+// 0:タイトル、1以降はステージの背景で、ランダムに選ばれる感じ。
+const BGCOLOR = ["#994C00", "red", "green", "blue", "orange", "darkolivegreen", "darkgreen", "navy", "darkslateblue",
+                 "goldenrod", "slateblue", "forestgreen", "teal", "seagreen", "indigo", "brown", "gold", "sienna", "dodgerblue"];
 
 // ブロックタイプ定数
 // NORMAL:白、薄い青、濃い青（幅2の厚み、文字無し）、LIFEUP:ピンク（Lの文字）、WALL:灰色（幅5の厚み）
@@ -180,6 +185,7 @@ let fsTitle =
 "precision mediump float;" +
 "uniform vec2 u_resolution;" +
 "uniform vec2 u_seed;" +
+"uniform vec3 u_blockColor;" +
 "const float pi = 3.14159;" +
 "const vec2 r_vector = vec2(12.9898, 78.233);" +
 "const float r_coeff = 43758.5453123;" +
@@ -253,13 +259,12 @@ let fsTitle =
 "  float hue = 0.55;" +
 // skyColorは0.55～0.58のグラデーションで
 "  vec3 baseColor = vec3(0.75);" +
-// cloudColorは白・・
-"  vec3 blockColor = brown;" +
+// blockColorはuniformで。
 // 最終的な色・・
 "  vec3 col;" +
 // nが0.4以下の所はskyColor, 0.6以上の所はcloudColorで、間の所は
 // smoothstepでblendしてみる。
-"  col = baseColor + (blockColor - baseColor) * smoothstep(0.42, 0.58, n);" +
+"  col = baseColor + (u_blockColor - baseColor) * smoothstep(0.42, 0.58, n);" +
 "  vec4 finalColor = vec4(col, 1.0);" +
 // グリッド
 "  if(fract(0.5 * q.x) < 0.05 || fract(q.y) < 0.1){ finalColor = vec4(brown * 0.5, 1.0); }" +
@@ -506,17 +511,20 @@ class Title extends State{
 		this.stage = 0; // レベル廃止
 		this.mode = 0;
 		this.stageSpace = createGraphics(700, 220);
-		this.modeSpace = createGraphics(350, 40);
+		this.modeSpace = createGraphics(390, 40);
 		this.playButton = createGraphics(120, 60);
 		this.drawPrepare();
 		this.bg = createGraphics(CANVAS_W, CANVAS_H, WEBGL); // 背景
-		this.createBackground();
+		this.bgShader = this.bg.createShader(vsTitle, fsTitle);
+		this.bg.shader(this.bgShader);
+		this.drawBackground();
 	}
-	createBackground(){
-		let bgShader = this.bg.createShader(vsTitle, fsTitle);
-		this.bg.shader(bgShader);
-		bgShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
-		bgShader.setUniform("seed", [Math.random() * 99, Math.random() * 99]);
+	drawBackground(){
+		//let bgShader = this.bg.createShader(vsTitle, fsTitle);
+		//this.bg.shader(bgShader);
+		this.bgShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
+		this.bgShader.setUniform("u_seed", [Math.random() * 99, Math.random() * 99]);
+		this.bgShader.setUniform("u_blockColor", uniformize(BGCOLOR[0]));
 		this.bg.quad(-1, -1, -1, 1, 1, 1, 1, -1);
 	}
 	drawNonActiveButton(gr, x, y, w, h, txt){
@@ -567,9 +575,9 @@ class Title extends State{
 		this.modeSpace.clear();
 		for(let i = 0; i < 4; i++){
 			if(i === this.mode){
-				this.drawActiveButton(this.modeSpace, 90 * i, 0, 80, 40, MODE_TEXT[i], MODE_HUE[i]);
+				this.drawActiveButton(this.modeSpace, 100 * i, 0, 90, 40, MODE_TEXT[i], MODE_HUE[i]);
 			}else{
-				this.drawNonActiveButton(this.modeSpace, 90 * i, 0, 80, 40, MODE_TEXT[i]);
+				this.drawNonActiveButton(this.modeSpace, 100 * i, 0, 90, 40, MODE_TEXT[i]);
 			}
 		}
 	}
@@ -591,6 +599,7 @@ class Title extends State{
 		// this.level = 0;
 		this.stage = 0;
 		this.mode = 0;
+		this.drawBackground(); // 背景は毎回書き換える
 		this.drawStageButtons();
 		this.drawModeButtons();
 	}
@@ -622,9 +631,9 @@ class Title extends State{
 			}
 			this.drawStageButtons();
 		}
-		if(mx > 225 && mx < 575 && my > 450 && my < 490){
-			if((mx - 225) % 90 > 80){ return; }
-			const newMode = Math.floor((mx - 225) / 90);
+		if(mx > 205 && mx < 595 && my > 450 && my < 490){
+			if((mx - 205) % 100 > 90){ return; }
+			const newMode = Math.floor((mx - 205) / 100);
 			if(newMode !== this.mode){
 				this.mode = newMode;
 				myMusic.playDecisionSound();
@@ -650,7 +659,7 @@ class Title extends State{
 		this.gr.textSize(45);
 		this.gr.text("----CLICK PLAY BUTTON----", 400, 160);
 		this.gr.image(this.stageSpace, 400 - 350, 210);
-		this.gr.image(this.modeSpace, 400 - 175, 450);
+		this.gr.image(this.modeSpace, 400 - 195, 450);
 		this.gr.image(this.playButton, 400 - 60, 510);
 		image(this.gr, 0, 0);
 	}
@@ -685,7 +694,7 @@ class Play extends State{
 		this.preAnimationSpan = 60;
 		this.drawPrepare();
 		this.bg = createGraphics(CANVAS_W, CANVAS_H, WEBGL);
-		this.bgShader = this.bg.createShader(vsPlay, fsPlay);
+		this.bgShader = this.bg.createShader(vsTitle, fsTitle);
 		this.bg.shader(this.bgShader);
 	}
 	drawPrepare(){
@@ -696,8 +705,8 @@ class Play extends State{
 	}
 	bgPrepare(){
 		this.bgShader.setUniform("u_resolution", [CANVAS_W, CANVAS_H]);
-		this.bgShader.setUniform("u_time", Math.floor(Math.random() * 999));
-		this.bgShader.setUniform("u_hue", Math.random()); // hueはもうランダムで
+		this.bgShader.setUniform("u_seed", [Math.random() * 99, Math.random() * 99]);
+		this.bgShader.setUniform("u_blockColor", uniformize(random(BGCOLOR))); // ランダムチョイス
 		this.bg.quad(-1, -1, -1, 1, 1, 1, 1, -1);
 	}
   prepare(_state){
@@ -1105,8 +1114,8 @@ class GameSystem{
 		this.particles.remove(); // パーティクルのリムーブ
 		if(!this.ball.isAlive()){ return; } // ボールが死んだら以降の処理をキャンセル
 		const offSet = this.getOffSet();
-		const mx = constrain((mouseX - offSet.x) / this.gr.width, 0, 1);
-		const my = constrain((mouseY - offSet.y) / this.gr.height, 0, 1);
+		const mx = constrain(mouseX - offSet.x, 0, this.gr.width);
+		const my = constrain(mouseY - offSet.y, 0, this.gr.height);
 		let paddleParticlePosList = [];
 		for(let pdl of this.paddles){
 			pdl.move(mx, my); pdl.updateBall(); pdl.update();
@@ -1159,7 +1168,6 @@ class GameSystem{
 	draw(){
 		// 背景
 		this.gr.image(this.bg, 0, 0);
-		//this.gr.background(0);
 		// ブロック、パドル、ボール
 		for(let b of this.blocks){ b.draw(this.gr); }
 		for(let ring of this.ringWalls){ ring.draw(this.gr); }
@@ -1223,6 +1231,14 @@ function createStagePattern1(){
 	sys.paddles.push(new LinePaddle(20, 460 - paddleLength, 436, 436, paddleLength, 4, -PI / 2),
                    new LinePaddle(20, 460 - paddleLength, 80, 80, paddleLength, 4, PI / 2));
 }
+
+// 左右パドル
+
+// 上下左右パドル
+
+// 上下中央上下パドル
+
+// 左右中央左右パドル
 
 // 0.
 function createStage0(){
@@ -1776,11 +1792,13 @@ class Paddle{
 	}
 }
 
+// 基本的にx1からx2まで
+// 上下の場合も・・うん。
 class LinePaddle extends Paddle{
 	constructor(x1, x2, y1, y2, w, h, direction){
 		super();
-		this.xRange = [x1, x2];
-		this.yRange = [y1, y2];
+		this.xRange = [min(x1, x2), max(x1,x2)];
+		this.yRange = [min(y1, y2), min(y1, y2)];
 		this.x = -100;
 		this.y = -100;
 		this.w = w;
@@ -1790,8 +1808,11 @@ class LinePaddle extends Paddle{
 	}
 	move(mx, my){
 		// mx, myは0～1の値でCANVAS_WやCANVAS_Hでconstrainされたマウス値でそれを元に位置を決める
-		this.x = this.xRange[0] * (1 - mx) + this.xRange[1] * mx;
-		this.y = this.yRange[0] * (1 - my) + this.yRange[1] * my;
+		// やめましょう。constrain使うわ。mxとmyは値をそのまま渡そう。
+		// とはいえそれだと大きい小さいで問題が生じるので・・んー、考えるよ。
+		// あー、えと、mxがthis.x + this.w * 0.5になるようにする。
+		this.x = constrain(mx - this.w * 0.5, this.xRange[0], this.xRange[1]);
+		this.y = constrain(my - this.h * 0.5, this.yRange[0], this.yRange[1]);
 		this.collider.update(this.x, this.y);
 		// arcの場合ここでdirectionもいじる
 	}
@@ -1812,54 +1833,10 @@ class LinePaddle extends Paddle{
 	}
 }
 
-// アークパドル。(mx, my)に対しては(0.5, 0.5)を中心として角度を割り出しそれに基づいて位置を決める感じ
-// directionFlagは1なら内向きで0なら外向き。0というのはつまり方向そのまんまって意味ね。1の場合はPIを足すと。
-// 厚さ4の円弧。描画はラインでやる。
-// めんどくさいからまた今度ね
+// アークパドル。作り直し。directionは-PI/2かPI/2のどっちか
 class ArcPaddle extends Paddle{
-	constructor(cx, cy, r, w, directionFlag){
+	constructor(cx, cy, w, h, direction){
 		super();
-		this.cx = cx;
-		this.cy = cy;
-		this.r = r;
-		this.w = w;
-		// t1とt2は端っこの角度の値です
-		this.t1 = -w * 0.5 / r;
-		this.t2 = w * 0.5 / r;
-		this.directionFlag = directionFlag; // 内向きか外向きかって話. 0なら外向き、1なら内向き。これのPI倍を足せばいい。
-		this.direction = directionFlag * Math.PI;
-		// パドルなので4で固定ね
-		this.collider = new ArcCollider(this.cx, this.cy, this.r, w);
-	}
-	move(mx, my){
-		// まず(0.5, 0.5)を中心とする方向を割り出す
-		const t = atan2(my - 0.5, mx - 0.5);
-		this.t1 = t - this.w * 0.5 / this.r;
-		this.t2 = t + this.w * 0.5 / this.r;
-		this.direction = t + this.directionFlag * Math.PI;
-		this.collider.update(this.t1, this.t2);
-	}
-	updateBall(){
-		if(this.ball === undefined){ return; }
-		// ボール保持中にボールのdirectionと位置をいじるやつ
-		const count = this.ball.getNonActiveFrameCount();
-		const n = 2 * (abs(60 - (count % 120)) - 30);
-		const ballDirection = this.direction + n * Math.PI / 180;
-		this.ball.setDirection(ballDirection);
-		const sgn = (this.directionFlag === 0 ? 1 : -1);
-		const cr = this.r + sgn * (this.ball.radius + 2);
-		// フラグ補正忘れずに
-		this.ball.setPos(this.cx + cr * Math.cos(this.direction + this.directionFlag * Math.PI),
-		                 this.cy + cr * Math.sin(this.direction + this.directionFlag * Math.PI));
-	}
-	draw(gr){
-		// t1からt2まで描画する
-		if(this.active){ gr.stroke(15, 100, 100); }else{ gr.stroke(15, 0, 100); }
-		gr.noFill();
-		gr.strokeWeight(4);
-		gr.arc(this.cx, this.cy, this.r * 2, this.r * 2, this.t1, this.t2);
-	  gr.noStroke();
-		this.drawPointer(gr);
 	}
 }
 
@@ -2481,4 +2458,12 @@ function keyPressed(){
 function mouseClicked(){
 	mySystem.currentState.clickAction();
 	return false;
+}
+
+// ----------------------------------------------------------------------------------- //
+// utility.
+
+function uniformize(colorName){
+	let col = color(colorName);
+	return [red(col) / 255, green(col) / 255, blue(col) / 255];
 }
