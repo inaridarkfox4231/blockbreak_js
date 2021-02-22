@@ -1204,7 +1204,21 @@ function createStagePattern1(){
 
 // 左右パドル
 
+
 // 上下左右パドル
+function createStagePattern3(){
+  let sys = mySystem.state.play.gameSystem;
+  sys.stageSetup(520, 460);
+  const colliders = [new RectCollider(0, 60, 520, 20), new RectCollider(0, 60, 20, 400),
+                     new RectCollider(500, 60, 20, 400), new RectCollider(0, 440, 520, 20)];
+  sys.gutter.setting(520, 460, colliders);
+  sys.setBlockGroup([1, 1, 24, 24], [4, 21, 4, 21], [1, 1, 1, 1], [1, 1, 1, 1]);
+	const paddleLength = PADDLE_LENGTH[sys.mode];
+  sys.paddles.push(new LinePaddle(40, 480 - paddleLength, 436, 436, paddleLength, 4, -PI / 2),
+                   new LinePaddle(40, 480 - paddleLength, 80, 80, paddleLength, 4, PI / 2),
+                   new LinePaddle(20, 20, 100, 420 - paddleLength, 4, paddleLength, 0),
+                   new LinePaddle(496, 496, 100, 420 - paddleLength, 4, paddleLength, -PI));
+}
 
 // 上下中央上下パドル
 
@@ -1526,6 +1540,13 @@ function createStage19(){
 	for(let x = 19; x <= 21; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 }
 
+// 20. あとで直すけど
+function createStage20(){
+  createStagePattern3()
+	let sys = mySystem.state.play.gameSystem;
+  sys.setBlockGroup([7, 9, 11, 13], [7, 9, 11, 13], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 3);
+}
+
 function createStage25(){
 	createStagePattern1()
 	let sys = mySystem.state.play.gameSystem;
@@ -1768,7 +1789,7 @@ class LinePaddle extends Paddle{
 	constructor(x1, x2, y1, y2, w, h, direction){
 		super();
 		this.xRange = [min(x1, x2), max(x1,x2)];
-		this.yRange = [min(y1, y2), min(y1, y2)];
+		this.yRange = [min(y1, y2), max(y1, y2)];
 		this.x = -100;
 		this.y = -100;
 		this.w = w;
