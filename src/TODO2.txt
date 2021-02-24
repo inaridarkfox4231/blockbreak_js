@@ -601,4 +601,56 @@ class Gutter{
 }
 
 
+// 厚みが必要。バームクーヘン的な。パドル専用。厚みは4で固定・・んー。
+// なくす。まあ、うん、なくす。
+class ArcCollider extends Collider{
+  constructor(cx, cy, r, w){
+		super();
+		this.type = "arc";
+		this.cx = cx;
+		this.cy = cy;
+		this.r = r;
+    this.w = w;
+		this.h = 4; // 厚み
+		this.t1 = -w * 0.5 / r;
+		this.t2 = w * 0.5 / r;
+	}
+	update(t1, t2){
+		this.t1 = t1;
+		this.t2 = t2;
+	}
+	collideWithBall(_ball, post = true){
+		// 速度を足す。
+		const d = _ball.direction;
+		const coeff = (post ? 1 : 0);
+		const bx = _ball.x + coeff * _ball.speed * cos(d);
+		const by = _ball.y + coeff * _ball.speed * sin(d);
+		// ボールの中心の方向がt1-diff～t2+diffの範囲内にあるか調べる。
+		// diffはthis.l/2に相当する長さの角度のずれ、要するにthis.l / (2 * this.r)ね。
+		// あったとして、今度は中心からの距離を取り、this.rとの差が、絶対値が、厚さの半分と半径の和より大きいならfalse.
+		// 扇形はそれほど大きいものを想定していないので範囲内かどうかについてはcosの値で判定すればOK.
+		const diff = this.h / (2 * this.r);
+		const ballDir = atan2(by - this.cy, bx - this.cx);
+		if(Math.cos(ballDir - diff - (this.t1 + this.t2) * 0.5) < Math.cos(diff + (this.t2 - this.t1) * 0.5)){ return false; }
+		const ballDistance = dist(bx, by, this.cx, this.cy);
+		if(abs(ballDistance - this.r) > this.h * 0.5 + _ball.radius){ return false; }
+		return true;
+	}
+	reflect(_ball){
+		// 中心がdiffの内側なら普通に反射する感じ。
+		// はじっこはやめましょう。
+		// constrainしてなるべく中央側に出るようにしようかな（内積でぶつかる方向を割り出して）
+		const d = _ball.direction;
+		const bx = _ball.x;
+		const by = _ball.y;
+		const diff = this.h / (2 * this.r);
+		const ballDir = atan2(by - this.cy, bx - this.cx);
+		//const ballDistance = dist(bx, by, this.cx, this.cy); // 使ってない
+		// diffの内側なので反射. いずれにせよballDirを中心として反対側に。
+		let v = createVector(_ball.speed * Math.cos(d), _ball.speed * Math.sin(d));
+		let n = p5.Vector.fromAngle(ballDir);
+		let u = p5.Vector.sub(v, p5.Vector.mult(n, 2 * p5.Vector.dot(v, n))); // 2を掛けてたよ・・multの引数にしないとね。
+		_ball.setDirection(u.heading());
+	}
+}
 */

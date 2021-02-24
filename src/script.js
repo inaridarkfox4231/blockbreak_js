@@ -13,7 +13,7 @@ const CANVAS_W = 800;
 const CANVAS_H = 600;
 const GRIDSIZE = 20;
 
-const STAGE_MAX = 19; // 最大ステージ数
+const STAGE_MAX = 21; // 最大ステージ数
 
 // KEYCODE定数
 const K_ENTER = 13;
@@ -1224,6 +1224,22 @@ function createStagePattern3(){
 
 // 左右中央左右パドル
 
+function createStagePattern5(){
+  let sys = mySystem.state.play.gameSystem;
+  sys.stageSetup(520, 460);
+  const colliders = [new RingCollider(260, 260, 180, 200)];
+  sys.gutter.setting(520, 460, colliders);
+	const paddleLength = PADDLE_LENGTH[sys.mode];
+  sys.paddles.push(new ArcPaddle(260, 260, 160, paddleLength, 4, 1));
+}
+
+// 21.
+function createStage21(){
+  createStagePattern5()
+	let sys = mySystem.state.play.gameSystem;
+  sys.setBlockGroup([9, 11, 13], [9, 11, 13], [2, 2, 2], [1, 1, 1], NORMAL, 3);
+}
+
 // 0.
 function createStage0(){
 	createStagePattern0()
@@ -1814,8 +1830,8 @@ class LinePaddle extends Paddle{
 		const n = 2 * (abs(60 - (count % 120)) - 30);
 		const ballDirection = this.direction + n * Math.PI / 180;
 		this.ball.setDirection(ballDirection);
-		this.ball.setPos(this.x + 0.5 * this.w + (0.5 * this.w + this.ball.radius) * cos(this.direction),
-		                 this.y + 0.5 * this.h + (0.5 * this.h + this.ball.radius) * sin(this.direction));
+		this.ball.setPos(this.x + 0.5 * this.w + (0.5 * this.w + this.ball.radius) * Math.cos(this.direction),
+		                 this.y + 0.5 * this.h + (0.5 * this.h + this.ball.radius) * Math.sin(this.direction));
 	}
 	draw(gr){
 		if(this.active){ gr.fill(15, 100, 100); }else{ gr.fill(15, 0, 100); }
@@ -1824,11 +1840,53 @@ class LinePaddle extends Paddle{
 	}
 }
 
-// アークパドル。作り直し。directionは-PI/2かPI/2のどっちか
+// アークパドル。作り直し。directionDiffが0のとき外向きで1のとき内向き
 class ArcPaddle extends Paddle{
-	constructor(cx, cy, w, h, direction){
+	constructor(cx, cy, r, w, h, directionDiff){
 		super();
+    this.cx = cx;
+    this.cy = cy;
+    this.r = r;
+    this.w = w;
+    this.h = h;
+    this.directionDiff = directionDiff; // 0のとき外向き、1のとき内向き
+    this.direction = directionDiff * Math.PI;
+    this.t = 0; // 存在角
+    this.collider = new SkewRectCollider(cx + r * Math.cos(this.t), cy + r * Math.sin(this.t), w, h, this.t + Math.PI * 0.5);
 	}
+  move(mx, my){
+    // mx,myがcx,cyからどの方向にあるか調べてatan2で角度出して～とかする
+    this.t = atan2(my - this.cy, mx - this.cx);
+    this.direction = this.t + this.directionDiff * Math.PI;
+    this.collider.update(this.cx + this.r * Math.cos(this.t), this.cy + this.r * Math.sin(this.t), this.t + Math.PI * 0.5);
+  }
+  updateBall(){
+    if(this.ball === undefined){ return; }
+		// ボール保持中にボールのdirectionと位置をいじるやつ
+    const count = this.ball.getNonActiveFrameCount();
+		const n = 2 * (abs(60 - (count % 120)) - 30);
+		const ballDirection = this.direction + n * Math.PI / 180;
+		this.ball.setDirection(ballDirection);
+    this.ball.setPos(this.cx + this.r * Math.cos(this.t) + (this.h * 0.5 + this.ball.radius) * Math.cos(this.direction),
+                     this.cy + this.r * Math.sin(this.t) + (this.h * 0.5 + this.ball.radius) * Math.sin(this.direction));
+  }
+  draw(gr){
+    // quadを使う
+		if(this.active){ gr.fill(15, 100, 100); }else{ gr.fill(15, 0, 100); }
+    const cx1 = this.cx + this.r * Math.cos(this.t);
+    const cy1 = this.cy + this.r * Math.sin(this.t);
+    const dir1 = this.t + Math.PI * 0.5;
+    const c1 = Math.cos(dir1) * this.w * 0.5;
+    const s1 = Math.sin(dir1) * this.w * 0.5;
+    const c2 = Math.cos(this.t + Math.PI) * this.h * 0.5;
+    const s2 = Math.sin(this.t + Math.PI) * this.h * 0.5;
+    gr.quad(cx1 + c1 + c2, cy1 + s1 + s2, cx1 + c1 - c2, cy1 + s1 - s2, cx1 - c1 - c2, cy1 - s1 - s2, cx1 - c1 + c2, cy1 - s1 + s2);
+    //gr.circle(cx1 - c1 + c2, cy1 - s1 + s2, 4);
+    //gr.circle(cx1 + c1 + c2, cy1 + s1 + s2, 4);
+    //gr.circle(cx1 + c1 - c2, cy1 + s1 - s2, 4);
+    //noLoop();
+    this.drawPointer(gr);
+  }
 }
 
 // ----------------------------------------------------------------------------------- //
@@ -2073,7 +2131,7 @@ class SkewRectCollider extends Collider{
 		this.cy = cy;
 		this.w = w;
 		this.h = h;
-		this.direction = dir;
+		this.direction = direction;
 	}
 	update(cx, cy, direction){
 		this.cx = cx;
@@ -2093,65 +2151,27 @@ class SkewRectCollider extends Collider{
 		const dir = this.direction;
 		const u = bx1 * Math.cos(dir) + by1 * Math.sin(dir);
 		const v = -bx1 * Math.sin(dir) + by1 * Math.cos(dir);
-		if(this.w * 0.5 < u - r || u + r < this.w * 0.5){ return false; }
-		if(this.h * 0.5 < v - r || v + r < this.h * 0.5){ return false; }
+		if(this.w * 0.5 < u - r || u + r < -this.w * 0.5){ return false; }
+		if(this.h * 0.5 < v - r || v + r < -this.h * 0.5){ return false; }
 		return true;
 	}
 	reflect(_ball){
 		// ぶつかる場合は速度を変える
-	}
-}
-
-// 厚みが必要。バームクーヘン的な。パドル専用。厚みは4で固定・・んー。
-// なくす。まあ、うん、なくす。
-class ArcCollider extends Collider{
-  constructor(cx, cy, r, w){
-		super();
-		this.type = "arc";
-		this.cx = cx;
-		this.cy = cy;
-		this.r = r;
-    this.w = w;
-		this.h = 4; // 厚み
-		this.t1 = -w * 0.5 / r;
-		this.t2 = w * 0.5 / r;
-	}
-	update(t1, t2){
-		this.t1 = t1;
-		this.t2 = t2;
-	}
-	collideWithBall(_ball, post = true){
-		// 速度を足す。
-		const d = _ball.direction;
-		const coeff = (post ? 1 : 0);
-		const bx = _ball.x + coeff * _ball.speed * cos(d);
-		const by = _ball.y + coeff * _ball.speed * sin(d);
-		// ボールの中心の方向がt1-diff～t2+diffの範囲内にあるか調べる。
-		// diffはthis.l/2に相当する長さの角度のずれ、要するにthis.l / (2 * this.r)ね。
-		// あったとして、今度は中心からの距離を取り、this.rとの差が、絶対値が、厚さの半分と半径の和より大きいならfalse.
-		// 扇形はそれほど大きいものを想定していないので範囲内かどうかについてはcosの値で判定すればOK.
-		const diff = this.h / (2 * this.r);
-		const ballDir = atan2(by - this.cy, bx - this.cx);
-		if(Math.cos(ballDir - diff - (this.t1 + this.t2) * 0.5) < Math.cos(diff + (this.t2 - this.t1) * 0.5)){ return false; }
-		const ballDistance = dist(bx, by, this.cx, this.cy);
-		if(abs(ballDistance - this.r) > this.h * 0.5 + _ball.radius){ return false; }
-		return true;
-	}
-	reflect(_ball){
-		// 中心がdiffの内側なら普通に反射する感じ。
-		// はじっこはやめましょう。
-		// constrainしてなるべく中央側に出るようにしようかな（内積でぶつかる方向を割り出して）
-		const d = _ball.direction;
-		const bx = _ball.x;
-		const by = _ball.y;
-		const diff = this.h / (2 * this.r);
-		const ballDir = atan2(by - this.cy, bx - this.cx);
-		//const ballDistance = dist(bx, by, this.cx, this.cy); // 使ってない
-		// diffの内側なので反射. いずれにせよballDirを中心として反対側に。
-		let v = createVector(_ball.speed * Math.cos(d), _ball.speed * Math.sin(d));
-		let n = p5.Vector.fromAngle(ballDir);
-		let u = p5.Vector.sub(v, p5.Vector.mult(n, 2 * p5.Vector.dot(v, n))); // 2を掛けてたよ・・multの引数にしないとね。
-		_ball.setDirection(u.heading());
+    const d = _ball.direction;
+		const r = _ball.radius;
+    const bx1 = bx - this.cx;
+		const by1 = by - this.cy;
+		const dir = this.direction;
+		const u = bx1 * Math.cos(dir) + by1 * Math.sin(dir);
+		const v = -bx1 * Math.sin(dir) + by1 * Math.cos(dir);
+    if(abs(u) < this.w * 0.5){ _ball.setDirection(-(d - dir) + dir); return; }
+    if(abs(v) < this.h * 0.5){ _ball.setDirection(Math.PI - (d - dir) + dir); return; }
+    let mainDirection;
+    if(u > this.w * 0.5 && v > this.h * 0.5){ mainDirection = Math.PI / 4; }
+		if(u < -this.w * 0.5 && v > this.h * 0.5){ mainDirection = Math.PI * 3 / 4; }
+		if(u < -this.w * 0.5 && v < -this.h * 0.5){ mainDirection = Math.PI * 5 / 4; }
+		if(u > this.w * 0.5 && v < -this.h * 0.5){ mainDirection = Math.PI * 7 / 4; }
+		_ball.setDirection(mainDirection + (Math.random() * 2 - 1) * Math.PI / 12 + dir);
 	}
 }
 
