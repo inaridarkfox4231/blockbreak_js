@@ -2138,7 +2138,7 @@ class SkewRectCollider extends Collider{
 		this.cy = cy;
 		this.direction = direction;
 	}
-	CollideWithBall(_ball, post = true){
+	collideWithBall(_ball, post = true){
 		// ボールをこっちのdirectionに平行な正方形とみなして衝突判定する
 		// postは速度を足すかどうかって話。ガターでは足さないので。
 		const d = _ball.direction;
@@ -2159,8 +2159,8 @@ class SkewRectCollider extends Collider{
 		// ぶつかる場合は速度を変える
     const d = _ball.direction;
 		const r = _ball.radius;
-    const bx1 = bx - this.cx;
-		const by1 = by - this.cy;
+    const bx1 = _ball.x - this.cx;
+		const by1 = _ball.y - this.cy;
 		const dir = this.direction;
 		const u = bx1 * Math.cos(dir) + by1 * Math.sin(dir);
 		const v = -bx1 * Math.sin(dir) + by1 * Math.cos(dir);
