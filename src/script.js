@@ -13,7 +13,7 @@ const CANVAS_W = 800;
 const CANVAS_H = 600;
 const GRIDSIZE = 20;
 
-const STAGE_MAX = 21; // 最大ステージ数
+const STAGE_MAX = 19; // 最大ステージ数
 
 // KEYCODE定数
 const K_ENTER = 13;
@@ -1233,13 +1233,6 @@ function createStagePattern5(){
   sys.paddles.push(new ArcPaddle(260, 260, 160, paddleLength, 4, 1));
 }
 
-// 21.
-function createStage21(){
-  createStagePattern5()
-	let sys = mySystem.state.play.gameSystem;
-  sys.setBlockGroup([9, 11, 13], [9, 11, 13], [2, 2, 2], [1, 1, 1], NORMAL, 3);
-}
-
 // 0.
 function createStage0(){
 	createStagePattern0()
@@ -1556,17 +1549,25 @@ function createStage19(){
 	for(let x = 19; x <= 21; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 }
 
-// 20. あとで直すけど
-function createStage20(){
+// 25.
+function createStage25(){
+	createStagePattern1()
+	let sys = mySystem.state.play.gameSystem;
+	sys.setBlock(11, 11, 2, 1, NORMAL, 5);
+}
+
+// 30.
+function createStage30(){
   createStagePattern3()
 	let sys = mySystem.state.play.gameSystem;
   sys.setBlockGroup([7, 9, 11, 13], [7, 9, 11, 13], [2, 2, 2, 2], [1, 1, 1, 1], NORMAL, 3);
 }
 
-function createStage25(){
-	createStagePattern1()
+// 50.
+function createStage50(){
+  createStagePattern5()
 	let sys = mySystem.state.play.gameSystem;
-	sys.setBlock(11, 11, 2, 1, NORMAL, 5);
+  sys.setBlockGroup([9, 11, 13], [9, 11, 13], [2, 2, 2], [1, 1, 1], NORMAL, 3);
 }
 
 // ----------------------------------------------------------------------------------- //
@@ -2164,8 +2165,20 @@ class SkewRectCollider extends Collider{
 		const dir = this.direction;
 		const u = bx1 * Math.cos(dir) + by1 * Math.sin(dir);
 		const v = -bx1 * Math.sin(dir) + by1 * Math.cos(dir);
-    if(abs(u) < this.w * 0.5){ _ball.setDirection(-(d - dir) + dir); return; }
-    if(abs(v) < this.h * 0.5){ _ball.setDirection(Math.PI - (d - dir) + dir); return; }
+    // ここで、当たった面に突き刺さる方向調べてそれに対し±60°でconstrainしたい。やり方は
+    // -(d - dir)とかMath.PI - (d - dir)のところ。これを制限する。
+    // 具体的にはまずwの方はsinの値の絶対値が0.5より大きいなら修正しない。
+    // 0.5より小さい場合は、cosの値が正ならsinの符号に応じて±PI/6にする
+    // cosの値が負ならsinの符号に応じて±PI*5/6にする。以上。
+    // バグの原因が分かるまで保留で。
+    if(abs(u) < this.w * 0.5){
+      _ball.setDirection(-(d - dir) + dir);
+      return;
+    }
+    if(abs(v) < this.h * 0.5){
+      _ball.setDirection(Math.PI - (d - dir) + dir);
+      return;
+    }
     let mainDirection;
     if(u > this.w * 0.5 && v > this.h * 0.5){ mainDirection = Math.PI / 4; }
 		if(u < -this.w * 0.5 && v > this.h * 0.5){ mainDirection = Math.PI * 3 / 4; }
