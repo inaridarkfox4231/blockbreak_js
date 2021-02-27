@@ -1224,13 +1224,16 @@ function createStagePattern3(){
 
 // 左右中央左右パドル
 
+// 円形パドルフィールド
+// マグマすれすれにすれば例の問題については解消出来そう。横からぶつけることができなくなるので。
+// ただ難易度は依然高いね・・やっぱスピードかなぁ。
 function createStagePattern5(){
   let sys = mySystem.state.play.gameSystem;
   sys.stageSetup(520, 460);
-  const colliders = [new RingCollider(260, 260, 180, 200)];
+  const colliders = [new RingCollider(260, 260, 180, 200)]; // 180が内側の半径
   sys.gutter.setting(520, 460, colliders);
 	const paddleLength = PADDLE_LENGTH[sys.mode];
-  sys.paddles.push(new ArcPaddle(260, 260, 160, paddleLength, 4, 1));
+  sys.paddles.push(new ArcPaddle(260, 260, Math.sqrt(pow(180, 2) - pow(paddleLength / 2, 2)) - 2, paddleLength, 4, 1));
 }
 
 // 0.
@@ -1564,7 +1567,7 @@ function createStage30(){
 }
 
 // 50.
-function createStage50(){
+function createStage20(){
   createStagePattern5()
 	let sys = mySystem.state.play.gameSystem;
   sys.setBlockGroup([9, 11, 13], [9, 11, 13], [2, 2, 2], [1, 1, 1], NORMAL, 3);
