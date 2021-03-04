@@ -30,9 +30,9 @@ const STATUS = {speed:[4, 6, 7], attack:[1, 2, 3], rotationSpeed:[0.1, 0.15, 0.1
 // パドル長
 const PADDLE_LENGTH = [80, 60, 40, 30];
 // ブロックヒュー
-const BLOCK_HUE = [18, 10, 0, 78, 65];
+const BLOCK_HUE = [18, 10, 0, 78, 65, 50, 25];
 // ブロックやボールが壊れるときの色パレット（黄色、オレンジ、赤、紫、青、ピンク、灰色、ライム、スカイブルー）
-const BREAK_PALETTE = ["#fff000", "#ffa500", "#ff0000", "#800080", "#0000cd", "#ff1493", "#888", "lime", "#00FFFF"];
+const BREAK_PALETTE = ["#fff000", "#ffa500", "#ff0000", "#800080", "#0000cd", "#00FFFF", "lime", "#888", "lime", "#00FFFF"];
 // モードテキスト
 const MODE_TEXT = ["EASY", "NORMAL", "HARD", "CRAZY"];
 const MODE_HUE = [40, 55, 70, 85];
@@ -975,7 +975,7 @@ class GameSystem{
 	}
 	createBallParticle(p, drawFunction, particleNum){
 		// ボールのパーティクル
-		this.particles.createParticle(p.x, p.y, color(BREAK_PALETTE[6 + this.ball.level]), drawFunction, particleNum);
+		this.particles.createParticle(p.x, p.y, color(BREAK_PALETTE[7 + this.ball.level]), drawFunction, particleNum);
 	}
 	createMovingParticle(){
 		// ボールがレベル1か2のときに移動中のパーティクルを出す
@@ -984,7 +984,7 @@ class GameSystem{
 		if(lv < 1){ return; }
 		const {x, y, radius:r} = this.ball;
 		const d = this.ball.getDirection();
-		this.particles.createParticle(x - r * cos(d), y - r * sin(d), color(BREAK_PALETTE[6 + this.ball.level]),
+		this.particles.createParticle(x - r * cos(d), y - r * sin(d), color(BREAK_PALETTE[7 + this.ball.level]),
 	                                drawSquare, lv, 0.35, false, d + Math.PI, d + Math.PI);
 	}
 	createBlockParticle(p, id, particleNum){
@@ -1226,7 +1226,8 @@ function createStagePattern3(){
 
 // 円形パドルフィールド
 // マグマすれすれにすれば例の問題については解消出来そう。横からぶつけることができなくなるので。
-// ただ難易度は依然高いね・・やっぱスピードかなぁ。
+// ただ難易度は依然高いね・・やっぱスピードかなぁ。半分か、2/3くらいにすればバランス的にはよさそう。それで、多分いける。
+// さてと、とりあえず21～25移しますか。
 function createStagePattern5(){
   let sys = mySystem.state.play.gameSystem;
   sys.stageSetup(520, 460);
@@ -1245,6 +1246,8 @@ function createStage0(){
 			sys.setBlock(x, y, 2, 1, NORMAL, 1);
 		}
 	}
+  sys.setBlock(11, 9, 2, 1, NORMAL, 6);
+  sys.setBlock(11, 10, 2, 1, NORMAL, 7);
 	for(let x = 6; x <= 16; x += 2){
 		for(let y = 12; y <= 13; y++){
 			sys.setBlock(x, y, 2, 1, NORMAL, 2);
@@ -1552,6 +1555,9 @@ function createStage19(){
 	for(let x = 19; x <= 21; x += 2){for(let y = 10; y <= 11; y++){ sys.setBlock(x, y, 2, 1, NORMAL, 1); }}
 }
 
+// 20.
+// どうでもよくなってきたな
+
 // 25.
 function createStage25(){
 	createStagePattern1()
@@ -1705,6 +1711,9 @@ class Ball{
 		this.y = y;
 	}
 	setDirection(direction){
+    // 若干ブレさせた方がよさそう（2～3°くらい）
+    // うん。動きが良くなった。
+    if(this.active){ direction += (Math.random() - 0.5) * 2 * 3 * Math.PI / 180; }
 		this.direction = direction;
 	}
 	update(){
@@ -1921,11 +1930,11 @@ class Block{
 		// パーティクル出力用のidを返す関数
 		switch(this.blockType){
 			case NORMAL:
-			  return this.tough - 1; // toughは1,2,3,4,5であることが前提
+			  return this.tough - 1; // toughは1,2,3,4,5,6,7
 			//case LIFEUP:
 			//  return 5;
 			case WALL:
-			  return 6;
+			  return 8;
 		}
 	}
 	drawBlockImage(){
@@ -1952,6 +1961,7 @@ class Block{
 	}
 	hitWithBall(_ball){
 		if(this.tough > 2 && _ball.attack < 2){ return; }
+    if(this.tough > 5 && _ball.attack < 3){ return; }
 		// タフネス1でダメージも1でかつwもhもGRIDSIZEx2以上の大きさの時に限り分裂. NORMALでもLIFEUPでも。
 		// LIFEUPの場合は上手くすれば5UPできるというわけ
 		if(this.tough === 1 && _ball.attack === 1 && this.w > GRIDSIZE && this.h > GRIDSIZE){ this.hasChild = true; }
