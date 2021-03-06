@@ -1238,21 +1238,15 @@ function createStagePattern5(){
 }
 
 // 0.
+// 最初のステージはこんなもんでいいよ
 function createStage0(){
 	createStagePattern0()
 	let sys = mySystem.state.play.gameSystem;
-	for(let x = 6; x <= 16; x += 2){
-		for(let y = 7; y <= 8; y++){
-			sys.setBlock(x, y, 2, 1, NORMAL, 1);
-		}
-	}
-  sys.setBlock(11, 9, 2, 1, NORMAL, 6);
-  sys.setBlock(11, 10, 2, 1, NORMAL, 7);
-	for(let x = 6; x <= 16; x += 2){
-		for(let y = 12; y <= 13; y++){
-			sys.setBlock(x, y, 2, 1, NORMAL, 2);
-		}
-	}
+  for(let x = 4; x < 20; x += 2){
+    for(let y = 6; y < 14; y++){
+      sys.setBlock(x, y, 2, 1, NORMAL, 1);
+    }
+  }
 }
 
 // 1.
